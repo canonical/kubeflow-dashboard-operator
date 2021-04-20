@@ -7,6 +7,10 @@ options:
     type: string
     default: admin
     description: Kubeflow Profile to create
+  dashboard-configmap:
+    type: string
+    default: centraldashboard-config
+    description: Kubeflow Profile to create
   registration-flow:
     type: boolean
     default: true
