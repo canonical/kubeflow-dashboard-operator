@@ -76,15 +76,12 @@ jobs:
         set -eux
         charmcraft build
         juju bundle deploy -b tests/bundle.yaml --build
-        juju wait -wvt 300
-        juju status
+
+        # https://bugs.launchpad.net/juju/+bug/1921739
+        (i=60; while ! juju wait -wvt 30 ; do ((--i)) || exit; sleep 1; done)
 
     - name: Test charm
-      run: |
-        set -eux
-        DASHBOARD_URL=`kubectl -n ci-test get svc kubeflow-dashboard -o jsonpath='{.spec.clusterIP}'`
-        curl DASHBOARD_URL:8082 -f
-        exit $?
+      run: curl -fv $(kubectl -n ci-test get svc kubeflow-dashboard -o jsonpath='{.spec.clusterIP}'):8082
 
     - name: Get all
       run: kubectl get all -A
@@ -95,7 +92,7 @@ jobs:
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -nci-test -ljuju-app
+      run: kubectl logs --tail 100 -nci-test -ljuju-app=kubeflow-dashboard
       if: failure()
 
     - name: Get operator logs

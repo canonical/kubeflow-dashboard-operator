@@ -37,6 +37,8 @@ class Operator(CharmBase):
         except NoCompatibleVersions as err:
             self.model.unit.status = BlockedStatus(str(err))
             return
+        else:
+            self.model.unit.status = ActiveStatus()
 
         for event in [
             self.on.install,
