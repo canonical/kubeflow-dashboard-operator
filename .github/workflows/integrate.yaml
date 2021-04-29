@@ -14,7 +14,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: sudo apt install tox
 
     - name: Lint code
       run: tox -e lint
@@ -28,7 +28,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: sudo apt-get install python3-pip tox
+      run: sudo apt install tox
 
     - name: Run unit tests
       run: tox -e unit
@@ -45,17 +45,6 @@ jobs:
       with:
         addons: '["dns", "storage", "rbac"]'
 
-    # Remove once this is fixed:
-    # https://github.com/actions/virtual-environments/issues/3185
-    - name: Twiddle with MicroK8s
-      run: |
-        set -eux
-        echo '--kubelet-preferred-address-types="InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP"' | sudo tee -a /var/snap/microk8s/current/args/kube-apiserver
-        sudo snap restart microk8s
-        sg microk8s -c 'microk8s status --wait-ready'
-        kubectl -nkube-system rollout status ds/calico-node
-        kubectl wait --for=condition=available -nkube-system deployment/coredns deployment/hostpath-provisioner
-
     - name: Install dependencies
       run: |
         set -eux
@@ -64,12 +53,14 @@ jobs:
         sudo snap install juju-helpers --classic
         sudo snap install juju-wait --classic
         sudo snap install yq
+        sudo apt update
+        sudo apt install -y tox firefox-geckodriver
 
     - name: Bootstrap Juju
       run: |
         set -eux
         sg microk8s -c 'juju bootstrap microk8s uk8s'
-        juju add-model ci-test
+        juju add-model kubeflow
 
     - name: Deploy charm
       run: |
@@ -80,11 +71,15 @@ jobs:
         # https://bugs.launchpad.net/juju/+bug/1921739
         (i=60; while ! juju wait -wvt 30 ; do ((--i)) || exit; sleep 1; done)
 
-    - name: Test charm
-      run: curl -fv $(kubectl -n ci-test get svc kubeflow-dashboard -o jsonpath='{.spec.clusterIP}'):8082
+    - name: Test charm with Selenium
+      run: tox -e selenium
 
     - name: Get all
       run: kubectl get all -A
+      if: failure()
+
+    - name: Get configmaps
+      run: kubectl get configmaps -A
       if: failure()
 
     - name: Get juju status
@@ -92,10 +87,16 @@ jobs:
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -nci-test -ljuju-app=kubeflow-dashboard
+      run: kubectl logs --tail 100 -nkubeflow -lapp.kubernetes.io/name=kubeflow-dashboard
       if: failure()
 
     - name: Get operator logs
-      run: kubectl logs --tail 100 -nci-test -ljuju-operator
+      run: kubectl logs --tail 100 -nkubeflow -loperator.juju.is/name
       if: failure()
 
+    - name: Upload selenium screenshots
+      uses: actions/upload-artifact@v2
+      with:
+        name: selenium-screenshots
+        path: /tmp/selenium-*.png
+      if: failure()

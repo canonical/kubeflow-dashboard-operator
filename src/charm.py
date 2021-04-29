@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
+import json
 import logging
-import yaml
 from pathlib import Path
 
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
-from ops.framework import StoredState
-
+import yaml
 from oci_image import OCIImageResource, OCIImageResourceError
+from ops.charm import CharmBase
+from ops.framework import StoredState
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import (
     NoCompatibleVersions,
     NoVersionsListed,
@@ -84,8 +84,7 @@ class Operator(CharmBase):
         kf_profiles = list(kf_profiles.get_data().values())[0]
         profiles_service = kf_profiles["service-name"]
 
-        port = self.model.config["port"]
-        profile = self.model.config["profile"]
+        config = self.model.config
 
         self.model.unit.status = MaintenanceStatus("Setting pod spec")
 
@@ -129,15 +128,13 @@ class Operator(CharmBase):
                             "USERID_HEADER": "kubeflow-userid",
                             "USERID_PREFIX": "",
                             "PROFILES_KFAM_SERVICE_HOST": f"{profiles_service}.{model}",
-                            "REGISTRATION_FLOW": self.model.config["registration-flow"],
-                            "DASHBOARD_LINKS_CONFIGMAP": self.model.config[
-                                "dashboard-configmap"
-                            ],
+                            "REGISTRATION_FLOW": config["registration-flow"],
+                            "DASHBOARD_LINKS_CONFIGMAP": config["dashboard-configmap"],
                         },
-                        "ports": [{"name": "ui", "containerPort": port}],
+                        "ports": [{"name": "ui", "containerPort": config["port"]}],
                         "kubernetes": {
                             "livenessProbe": {
-                                "httpGet": {"path": "/healthz", "port": port},
+                                "httpGet": {"path": "/healthz", "port": config["port"]},
                                 "initialDelaySeconds": 30,
                                 "periodSeconds": 30,
                             }
@@ -146,6 +143,16 @@ class Operator(CharmBase):
                 ],
             },
             {
+                "configMaps": {
+                    config["dashboard-configmap"]: {
+                        "settings": json.dumps(
+                            {
+                                "DASHBOARD_FORCE_IFRAME": True,
+                            }
+                        ),
+                        "links": Path("src/config.json").read_text(),
+                    },
+                },
                 "kubernetesResources": {
                     "customResourceDefinitions": [
                         {"name": crd["metadata"]["name"], "spec": crd["spec"]}
@@ -158,12 +165,14 @@ class Operator(CharmBase):
                             {
                                 "apiVersion": "kubeflow.org/v1beta1",
                                 "kind": "Profile",
-                                "metadata": {"name": profile},
-                                "spec": {"owner": {"kind": "User", "name": profile}},
+                                "metadata": {"name": config["profile"]},
+                                "spec": {
+                                    "owner": {"kind": "User", "name": config["profile"]}
+                                },
                             }
                         ]
                     },
-                }
+                },
             },
         )
 

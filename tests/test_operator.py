@@ -62,5 +62,8 @@ def test_with_relation(harness):
     )
     harness.begin_with_initial_hooks()
 
-    _ = harness.get_pod_spec()
+    _, k8s = harness.get_pod_spec()
+    expected = yaml.safe_load(open("src/config.json"))
+    got = yaml.safe_load(k8s["configMaps"]["centraldashboard-config"]["links"])
+    assert got == expected
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
