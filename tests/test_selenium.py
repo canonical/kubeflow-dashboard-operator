@@ -28,7 +28,7 @@ def fix_queryselector(elems):
 def driver(request):
     status = yaml.safe_load(check_output(["juju", "status", "--format=yaml"]))
     endpoint = status["applications"]["kubeflow-dashboard"]["address"]
-    url = f"http://{endpoint}.xip.io:8082/"
+    url = f"http://{endpoint}.nip.io:8082/"
     options = Options()
     options.headless = True
 
