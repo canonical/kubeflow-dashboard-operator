@@ -46,6 +46,12 @@
             "link": "/pipeline/#/executions",
             "text": "Executions",
             "icon": "av:play-arrow"
+        },
+        {
+            "type": "item",
+            "link": "/volumes/",
+            "text": "Volumes",
+            "icon": "device:storage"
         }
     ],
     "externalLinks": [],
