@@ -9,6 +9,7 @@ from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
+
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
@@ -18,19 +19,33 @@ async def test_build_and_deploy(ops_test):
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
     await ops_test.model.deploy(my_charm, resources={"oci-image": image_path})
-    await ops_test.model.deploy("cs:kubeflow-profiles")
-    await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
 
-    await ops_test.model.block_until(
-        lambda: all(
-            unit.workload_status == "active" and unit.agent_status == "idle"
-            for _, application in ops_test.model.applications.items()
-            for unit in application.units
-        ),
-        timeout=600,
+    charm_name = METADATA["name"]
+    await ops_test.model.wait_for_idle(
+        [charm_name],
+        raise_on_blocked=True,
+        raise_on_error=True,
+        timeout=300,
+    )
+    assert ops_test.model.applications[charm_name].units[0].workload_status == "waiting"
+    assert (
+        ops_test.model.applications[charm_name].units[0].workload_status_message
+        == "Waiting for kubeflow-profiles relation data"
     )
 
-    await ops_test.model.wait_for_idle(raise_on_error=False, wait_for_active=True)
+
+@pytest.mark.abort_on_fail
+async def test_add_profile_relation(ops_test):
+    charm_name = METADATA["name"]
+    await ops_test.model.deploy("cs:kubeflow-profiles")
+    await ops_test.model.add_relation("kubeflow-profiles", charm_name)
+    await ops_test.model.wait_for_idle(
+        ["kubeflow-profiles", charm_name],
+        wait_for_active=True,
+        raise_on_blocked=True,
+        raise_on_error=True,
+        timeout=300,
+    )
 
 
 async def test_status(ops_test):

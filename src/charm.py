@@ -4,7 +4,6 @@ import json
 import logging
 from pathlib import Path
 
-import yaml
 from oci_image import OCIImageResource, OCIImageResourceError
 from ops.charm import CharmBase
 from ops.framework import StoredState
@@ -22,6 +21,14 @@ class Operator(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        if self.model.name != "kubeflow":
+            # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
+            self.model.unit.status = BlockedStatus(
+                "kubeflow-dashboard must be deployed to model named `kubeflow`:"
+                " https://git.io/J6d35"
+            )
+            return
+
         if not self.unit.is_leader():
             # We can't do anything useful when not the leader, so do nothing.
             self.model.unit.status = WaitingStatus("Waiting for leadership")
@@ -37,8 +44,6 @@ class Operator(CharmBase):
         except NoCompatibleVersions as err:
             self.model.unit.status = BlockedStatus(str(err))
             return
-        else:
-            self.model.unit.status = ActiveStatus()
 
         for event in [
             self.on.install,
@@ -154,12 +159,6 @@ class Operator(CharmBase):
                     },
                 },
                 "kubernetesResources": {
-                    "customResourceDefinitions": [
-                        {"name": crd["metadata"]["name"], "spec": crd["spec"]}
-                        for crd in yaml.safe_load_all(
-                            Path("files/crds.yaml").read_text()
-                        )
-                    ],
                     "customResources": {
                         "profiles.kubeflow.org": [
                             {
