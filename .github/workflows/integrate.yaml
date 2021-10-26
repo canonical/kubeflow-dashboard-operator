@@ -44,6 +44,12 @@ jobs:
         with:
             provider: microk8s
             channel: 1.21/stable
+
+      # TODO: Remove once the actions-operator does this automatically
+      - name: Configure kubectl
+        run: |
+          sg microk8s -c "microk8s config > ~/.kube/config"
+
       - name: Run test
         run: |
           # Requires the model to be called kubeflow due to this bug:
@@ -51,11 +57,6 @@ jobs:
           juju add-model kubeflow
           sudo apt install -y firefox-geckodriver
           sg microk8s -c "tox -e integration -- --model kubeflow"
-
-      # TODO: Remove once the actions-operator does this automatically
-      - name: Configure kubectl
-        run: |
-          sg microk8s -c "microk8s config > ~/.kube/config"
 
       - name: Get all
         run: kubectl get all -A
