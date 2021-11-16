@@ -1,3 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from pathlib import Path
 from subprocess import check_output
 from time import sleep

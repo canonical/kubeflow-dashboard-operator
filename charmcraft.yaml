@@ -1,3 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 type: charm
 bases:
   - build-on:
@@ -10,3 +13,4 @@ parts:
   charm:
     prime:
       - files/*yaml
+    charm-python-packages: [setuptools, pip]  # Fixes install of some packages
