@@ -21,7 +21,7 @@ def test_not_kubeflow_model():
     # Tests that unit will BlockStatus if deployed outside a model named kubeflow
     # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
     harness = Harness(Operator)
-    harness.begin()
+    harness.begin_with_initial_hooks()
     assert harness.charm.model.unit.status == BlockedStatus(
         "kubeflow-dashboard must be deployed to model named `kubeflow`:"
         " https://git.io/J6d35"
@@ -29,7 +29,7 @@ def test_not_kubeflow_model():
 
 
 def test_not_leader(harness):
-    harness.begin()
+    harness.begin_with_initial_hooks()
     assert harness.charm.model.unit.status == WaitingStatus("Waiting for leadership")
 
 

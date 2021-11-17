@@ -8,7 +8,6 @@ from pathlib import Path
 
 from oci_image import OCIImageResource, OCIImageResourceError
 from ops.charm import CharmBase
-from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import (
@@ -18,34 +17,23 @@ from serialized_data_interface import (
 )
 
 
-class Operator(CharmBase):
-    _stored = StoredState()
+class CheckFailed(Exception):
+    """ Raise this exception if one of the checks in main fails. """
 
+    def __init__(self, msg, status_type=None):
+        super().__init__()
+
+        self.msg = msg
+        self.status_type = status_type
+        self.status = status_type(msg)
+
+
+class Operator(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        if self.model.name != "kubeflow":
-            # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
-            self.model.unit.status = BlockedStatus(
-                "kubeflow-dashboard must be deployed to model named `kubeflow`:"
-                " https://git.io/J6d35"
-            )
-            return
 
-        if not self.unit.is_leader():
-            # We can't do anything useful when not the leader, so do nothing.
-            self.model.unit.status = WaitingStatus("Waiting for leadership")
-            return
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
-
-        try:
-            self.interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            self.model.unit.status = WaitingStatus(str(err))
-            return
-        except NoCompatibleVersions as err:
-            self.model.unit.status = BlockedStatus(str(err))
-            return
 
         for event in [
             self.on.install,
@@ -53,44 +41,31 @@ class Operator(CharmBase):
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on["kubeflow-profiles"].relation_changed,
+            self.on["ingress"].relation_changed,
         ]:
             self.framework.observe(event, self.main)
 
-        self.framework.observe(self.on["ingress"].relation_changed, self.configure_mesh)
-
-    def configure_mesh(self, event):
-        if self.interfaces["ingress"]:
-            self.interfaces["ingress"].send_data(
-                {
-                    "prefix": "/",
-                    "rewrite": "/",
-                    "service": self.model.app.name,
-                    "port": self.model.config["port"],
-                }
-            )
-
     def main(self, event):
         try:
-            image_details = self.image.fetch()
-        except OCIImageResourceError as e:
-            self.model.unit.status = e.status
-            self.log.info(e)
+            self._check_model_name()
+
+            self._check_leader()
+
+            interfaces = self._get_interfaces()
+
+            image_details = self._check_image_details()
+
+            kf_profiles = self._check_kf_profiles(interfaces)
+        except CheckFailed as check_failed:
+            self.model.unit.status = check_failed.status
             return
 
-        model = self.model.name
-
-        if not (
-            (kf_profiles := self.interfaces["kubeflow-profiles"])
-            and kf_profiles.get_data()
-        ):
-            self.model.unit.status = WaitingStatus(
-                "Waiting for kubeflow-profiles relation data"
-            )
-            return
+        self._configure_mesh(interfaces)
 
         kf_profiles = list(kf_profiles.get_data().values())[0]
         profiles_service = kf_profiles["service-name"]
 
+        model = self.model.name
         config = self.model.config
 
         self.model.unit.status = MaintenanceStatus("Setting pod spec")
@@ -178,6 +153,57 @@ class Operator(CharmBase):
         )
 
         self.model.unit.status = ActiveStatus()
+
+    def _configure_mesh(self, interfaces):
+        if interfaces["ingress"]:
+            interfaces["ingress"].send_data(
+                {
+                    "prefix": "/",
+                    "rewrite": "/",
+                    "service": self.model.app.name,
+                    "port": self.model.config["port"],
+                }
+            )
+
+    def _check_model_name(self):
+        if self.model.name != "kubeflow":
+            # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
+            raise CheckFailed(
+                "kubeflow-dashboard must be deployed to model named `kubeflow`:"
+                " https://git.io/J6d35",
+                BlockedStatus,
+            )
+
+    def _check_leader(self):
+        if not self.unit.is_leader():
+            # We can't do anything useful when not the leader, so do nothing.
+            raise CheckFailed("Waiting for leadership", WaitingStatus)
+
+    def _get_interfaces(self):
+        try:
+            interfaces = get_interfaces(self)
+        except NoVersionsListed as err:
+            raise CheckFailed(err, WaitingStatus)
+        except NoCompatibleVersions as err:
+            raise CheckFailed(err, BlockedStatus)
+        return interfaces
+
+    def _check_image_details(self):
+        try:
+            image_details = self.image.fetch()
+        except OCIImageResourceError as e:
+            raise CheckFailed(f"{e.status_message}: oci-image", e.status_type)
+        return image_details
+
+    def _check_kf_profiles(self, interfaces):
+        if not (
+            (kf_profiles := interfaces["kubeflow-profiles"]) and kf_profiles.get_data()
+        ):
+            raise CheckFailed(
+                "Waiting for kubeflow-profiles relation data", WaitingStatus
+            )
+
+        return kf_profiles
 
 
 if __name__ == "__main__":
