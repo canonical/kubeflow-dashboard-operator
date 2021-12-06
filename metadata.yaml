@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 name: kubeflow-dashboard
-display-name: Kubeflow Central Dashboard
 summary: Kubeflow Central Dashboard
 description: Kubeflow Central Dashboard
 maintainers: [Juju Developers <juju@lists.ubuntu.com>]
