@@ -40,11 +40,12 @@ async def test_build_and_deploy(ops_test):
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test):
     charm_name = METADATA["name"]
-    await ops_test.model.deploy("cs:kubeflow-profiles")
+    # TODO: Point kubeflow-profiles to latest/stable when Rev 54 or higher are promoted
+    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
     await ops_test.model.add_relation("kubeflow-profiles", charm_name)
     await ops_test.model.wait_for_idle(
         ["kubeflow-profiles", charm_name],
-        wait_for_active=True,
+        status='active',
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
