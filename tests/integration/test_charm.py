@@ -45,7 +45,7 @@ async def test_add_profile_relation(ops_test):
     await ops_test.model.add_relation("kubeflow-profiles", charm_name)
     await ops_test.model.wait_for_idle(
         ["kubeflow-profiles", charm_name],
-        status='active',
+        status="active",
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
