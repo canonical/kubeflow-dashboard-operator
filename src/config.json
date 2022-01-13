@@ -52,6 +52,12 @@
             "link": "/volumes/",
             "text": "Volumes",
             "icon": "device:storage"
+        },
+        {
+          "type": "item",
+          "link": "/tensorboards/",
+          "text": "Tensorboards",
+          "icon": "assessment"
         }
     ],
     "externalLinks": [],
