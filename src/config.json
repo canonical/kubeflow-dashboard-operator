@@ -74,6 +74,12 @@
             "text": "View Katib Experiments",
             "desc": "Katib",
             "link": "/katib/"
+        },
+        {
+          "type": "item",
+          "link": "/tensorboards/",
+          "text": "Tensorboards",
+          "icon": "assessment"
         }
     ],
     "documentationItems": [{
