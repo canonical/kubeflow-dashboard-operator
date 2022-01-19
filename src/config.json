@@ -37,18 +37,6 @@
         },
         {
             "type": "item",
-            "link": "/pipeline/#/artifacts",
-            "text": "Artifacts",
-            "icon": "editor:bubble-chart"
-        },
-        {
-            "type": "item",
-            "link": "/pipeline/#/executions",
-            "text": "Executions",
-            "icon": "av:play-arrow"
-        },
-        {
-            "type": "item",
             "link": "/volumes/",
             "text": "Volumes",
             "icon": "device:storage"
