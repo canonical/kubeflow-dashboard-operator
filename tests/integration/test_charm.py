@@ -114,8 +114,11 @@ def test_links(driver):
         "/pipeline/#/pipelines",
         "/pipeline/#/runs",
         "/pipeline/#/recurringruns",
-        "/pipeline/#/artifacts",
-        "/pipeline/#/executions",
+        # Removed temporarily until https://warthogs.atlassian.net/browse/KF-175 is fixed
+        # "/pipeline/#/artifacts",
+        # "/pipeline/#/executions",
+        "/volumes/",
+        "/tensorboards/",
     ]
 
     for link in links:
