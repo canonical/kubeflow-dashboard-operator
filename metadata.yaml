@@ -3,6 +3,7 @@
 name: kubeflow-dashboard
 summary: Kubeflow Central Dashboard
 description: Kubeflow Central Dashboard
+min-juju-version: "2.9.0"
 series: [kubernetes]
 resources:
   oci-image:
