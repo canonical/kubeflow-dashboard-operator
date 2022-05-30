@@ -13,4 +13,5 @@ parts:
   charm:
     prime:
       - files/*yaml
-    charm-python-packages: [setuptools, pip]  # Fixes install of some packages
+    # do not use these versions due to pypa/setuptools_scm#713
+    charm-python-packages: [ setuptools!=62.2.0, pip!=22.1 ]
