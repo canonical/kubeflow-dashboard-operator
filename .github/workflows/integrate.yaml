@@ -53,6 +53,11 @@ jobs:
   deploy:
     name: Integration Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dependency_context:
+          - https://raw.githubusercontent.com/canonical/bundle-kubeflow/master/releases/1.4/edge/kubeflow/bundle.yaml
+          - https://raw.githubusercontent.com/canonical/bundle-kubeflow/master/releases/1.4/latest/kubeflow/bundle.yaml
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -74,7 +79,7 @@ jobs:
           # https://github.com/kubeflow/kubeflow/issues/6136
           juju add-model kubeflow
           sudo apt install -y firefox-geckodriver
-          sg microk8s -c "tox -e integration -- --model kubeflow"
+          sg microk8s -c "tox -e integration -- --model kubeflow --version-bundle-uri ${{ matrix.dependency_context }}"
 
       - name: Get all
         run: kubectl get all -A
