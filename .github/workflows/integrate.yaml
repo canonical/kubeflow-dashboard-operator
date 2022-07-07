@@ -57,7 +57,7 @@ jobs:
       matrix:
         dependency_context:
           - https://raw.githubusercontent.com/canonical/bundle-kubeflow/master/releases/1.4/edge/kubeflow/bundle.yaml
-          - https://raw.githubusercontent.com/canonical/bundle-kubeflow/master/releases/1.4/latest/kubeflow/bundle.yaml
+          - https://raw.githubusercontent.com/canonical/bundle-kubeflow/master/releases/1.4/stable/kubeflow/bundle.yaml
     steps:
       - name: Check out code
         uses: actions/checkout@v2
