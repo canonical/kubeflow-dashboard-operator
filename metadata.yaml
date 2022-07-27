@@ -20,3 +20,6 @@ requires:
     interface: k8s-service
     schema: https://raw.githubusercontent.com/canonical/operator-schemas/master/k8s-service.yaml
     versions: [v1]
+  sidepanel:
+    interface: sidepanel
+    optional: true
