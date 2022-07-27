@@ -10,7 +10,7 @@ from pathlib import Path
 from hashlib import sha256
 
 from oci_image import OCIImageResource, OCIImageResourceError
-from ops.charm import CharmBase, RelationJoinedEvent, RelationDepartedEvent
+from ops.charm import CharmBase, RelationChangedEvent, RelationBrokenEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -55,11 +55,11 @@ class Operator(CharmBase):
         ]:
             self.framework.observe(event, self.main)
         self.framework.observe(
-            self.on.sidepanel_relation_joined, self._on_sidepanel_relation_joined
+            self.on.sidepanel_relation_changed, self._on_sidepanel_relation_changed
         )
         self.framework.observe(
-            self.on.sidepanel_relation_departed,
-            self._on_sidepanel_relation_departed,
+            self.on.sidepanel_relation_broken,
+            self._on_sidepanel_relation_broken,
         )
 
     def main(self, event):
@@ -173,14 +173,14 @@ class Operator(CharmBase):
 
         self.model.unit.status = ActiveStatus()
 
-    def _on_sidepanel_relation_joined(self, event: RelationJoinedEvent):
+    def _on_sidepanel_relation_changed(self, event: RelationChangedEvent):
         try:
             self._check_leader()
         except CheckFailed as check_failed:
             self.model.unit.status = check_failed.status
             return
-        self.log.info(f"ADDING {event.app.name} to side panel")
         if event.app.name in SIDEBAR_EXTRA_OPTIONS:
+            self.log.info(f"ADDING {event.app.name} to side panel")
             side_bar_tabs_dict = json.loads(self._stored.side_bar_tabs)
             if (
                 SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
@@ -189,25 +189,25 @@ class Operator(CharmBase):
                 side_bar_tabs_dict["menuLinks"].append(
                     SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
                 )
-                self.log.debug(f"NEW SIDE BAR {side_bar_tabs_dict}")
+                self.log.info(f"NEW SIDE BAR {side_bar_tabs_dict}")
                 self._stored.side_bar_tabs = json.dumps(side_bar_tabs_dict)
                 self.main(event)
 
-    def _on_sidepanel_relation_departed(self, event: RelationDepartedEvent):
+    def _on_sidepanel_relation_broken(self, event: RelationBrokenEvent):
         try:
             self._check_leader()
         except CheckFailed as check_failed:
             self.model.unit.status = check_failed.status
             return
-        self.log.info(f"REMOVING {event.app.name} to side panel")
         if event.app.name in SIDEBAR_EXTRA_OPTIONS:
+            self.log.info(f"REMOVING {event.app.name} to side panel")
             side_bar_tabs_dict = json.loads(self._stored.side_bar_tabs)
             side_bar_tabs_dict["menuLinks"] = [
                 link
                 for link in side_bar_tabs_dict["menuLinks"]
                 if link != SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
             ]
-            self.log.debug(f"NEW SIDE BAR {side_bar_tabs_dict}")
+            self.log.info(f"NEW SIDE BAR {side_bar_tabs_dict}")
             self._stored.side_bar_tabs = json.dumps(side_bar_tabs_dict)
             self.main(event)
 
