@@ -108,7 +108,7 @@ def test_links(driver):
     # Ensure that sidebar links are set up properly
     links = [
         "/jupyter/",
-        "/katib/",
+        # "/katib/",  # katib no longer available in default sidebar
         "/pipeline/#/experiments",
         "/pipeline/#/pipelines",
         "/pipeline/#/runs",
@@ -117,7 +117,7 @@ def test_links(driver):
         # "/pipeline/#/artifacts",
         # "/pipeline/#/executions",
         "/volumes/",
-        "/tensorboards/",
+        # "/tensorboards/", # tensorboards no longer available in default sidebar
     ]
 
     for link in links:

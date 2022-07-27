@@ -43,9 +43,7 @@ class Operator(CharmBase):
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
         self._stored.set_default(hash_salt=_gen_pass())
-        self._stored.set_default(
-            side_bar_tabs=Path("src/config.json").read_text()
-        )
+        self._stored.set_default(side_bar_tabs=Path("src/config.json").read_text())
 
         for event in [
             self.on.install,
