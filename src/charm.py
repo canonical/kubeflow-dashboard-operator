@@ -4,23 +4,24 @@
 
 import json
 import logging
-from random import choices
-from string import ascii_uppercase, digits
-from pathlib import Path
-from hashlib import sha256
+import traceback
 
-from oci_image import OCIImageResource, OCIImageResourceError
-from ops.charm import CharmBase, RelationChangedEvent, RelationBrokenEvent
-from ops.framework import StoredState
+from pathlib import Path
+
+from charmed_kubeflow_chisme.lightkube.batch import apply_many
+from jinja2 import Environment, FileSystemLoader
+from lightkube import Client, ApiError, codecs
+from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.pebble import ChangeError, Layer
 from serialized_data_interface import (
     NoCompatibleVersions,
     NoVersionsListed,
     get_interfaces,
 )
 
-SIDEBAR_EXTRA_OPTIONS = json.loads(Path("src/extra_config.json").read_text())
+BASE_SIDEBAR = json.loads(Path("src/config.json").read_text())
 
 
 class CheckFailed(Exception):
@@ -34,204 +35,75 @@ class CheckFailed(Exception):
         self.status = status_type(self.msg)
 
 
-class Operator(CharmBase):
-    _stored = StoredState()
+class KubeflowDashboardOperator(CharmBase):
+    """A Juju Charm for Kubeflow Dashboard Operator"""
 
     def __init__(self, *args):
-        super().__init__(*args)
+        super.__init__(self, *args)
 
-        self.log = logging.getLogger(__name__)
-        self.image = OCIImageResource(self, "oci-image")
-        self._stored.set_default(hash_salt=_gen_pass())
-        self._stored.set_default(side_bar_tabs=Path("src/config.json").read_text())
-
+        self.logger = logging.getLogger(__name__)
+        self.lightkube_field_manager = "lightkube"
+        self.lightkube_client = Client(
+            namespace=self._namespace, field_manager=self.lightkube_field_manager
+        )
+        self.env = Environment(loader=FileSystemLoader("src"))
+        self._name = self.model.app.name
+        self._namespace = self.model.name
+        self._entrypoint = "npm start"
+        self._container_name = "kubeflow-dashboard"
+        self._container = self.unit.get_container(self._name)
+        self._resource_files = {
+            "crds": "crds_manifests.yaml",
+            # "service_accounts":  "service_account.yaml",
+            "config_maps": "configmaps_manifests.yaml",
+        }
+        self._context = {
+            "namespace": self._namespace,
+            "configmap_name": self.model.config["dashboard-configmap"],
+            "profilename": self.model.config["profile"],
+            "links": Path("src/config.json").read_text(),
+            "settings": json.dumps(
+                {
+                    "DASHBOARD_FORCE_IFRAME": True,
+                }
+            ),
+        }
         for event in [
             self.on.install,
-            self.on.leader_elected,
-            self.on.upgrade_charm,
             self.on.config_changed,
-            self.on["kubeflow-profiles"].relation_changed,
-            self.on["ingress"].relation_changed,
+            self.on.ingress_relation_changed,
+            self.on.knative_operator_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
-        self.framework.observe(
-            self.on.sidepanel_relation_changed, self._on_sidepanel_relation_changed
-        )
-        self.framework.observe(
-            self.on.sidepanel_relation_broken,
-            self._on_sidepanel_relation_broken,
-        )
 
-    def main(self, event):
-        try:
-            self._check_model_name()
-
-            self._check_leader()
-
-            interfaces = self._get_interfaces()
-
-            image_details = self._check_image_details()
-
-            kf_profiles = self._check_kf_profiles(interfaces)
-        except CheckFailed as check_failed:
-            self.model.unit.status = check_failed.status
-            return
-
-        self._configure_mesh(interfaces)
-
-        kf_profiles = list(kf_profiles.get_data().values())[0]
-        profiles_service = kf_profiles["service-name"]
-
-        model = self.model.name
-        config = self.model.config
-        configmap_hash = self._generate_config_hash()
-
-        self.model.unit.status = MaintenanceStatus("Setting pod spec")
-
-        self.model.pod.set_spec(
-            {
-                "version": 3,
-                "serviceAccount": {
-                    "roles": [
-                        {
-                            "global": True,
-                            "rules": [
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["events", "namespaces", "nodes"],
-                                    "verbs": ["get", "list", "watch"],
-                                },
-                                {
-                                    "apiGroups": ["", "app.k8s.io"],
-                                    "resources": [
-                                        "applications",
-                                        "pods",
-                                        "pods/exec",
-                                        "pods/log",
-                                    ],
-                                    "verbs": ["get", "list", "watch"],
-                                },
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["secrets", "configmaps"],
-                                    "verbs": ["get"],
-                                },
-                            ],
-                        }
-                    ]
-                },
-                "containers": [
-                    {
-                        "name": "kubeflow-dashboard",
-                        "imageDetails": image_details,
-                        "envConfig": {
-                            "USERID_HEADER": "kubeflow-userid",
-                            "USERID_PREFIX": "",
-                            "PROFILES_KFAM_SERVICE_HOST": f"{profiles_service}.{model}",
-                            "REGISTRATION_FLOW": config["registration-flow"],
-                            "DASHBOARD_LINKS_CONFIGMAP": config["dashboard-configmap"],
-                            "CONFIGMAP_HASH": configmap_hash,
-                        },
-                        "ports": [{"name": "ui", "containerPort": config["port"]}],
-                        "kubernetes": {
-                            "livenessProbe": {
-                                "httpGet": {"path": "/healthz", "port": config["port"]},
-                                "initialDelaySeconds": 30,
-                                "periodSeconds": 30,
-                            }
-                        },
-                    }
-                ],
-            },
-            {
-                "configMaps": {
-                    config["dashboard-configmap"]: {
-                        "settings": json.dumps(
-                            {
-                                "DASHBOARD_FORCE_IFRAME": True,
-                            }
-                        ),
-                        "links": self._stored.side_bar_tabs,
+    def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
+        """Returns a pre-configured Pebble layer."""
+        layer_config = {
+            "summary": "dex-auth-operator layer",
+            "description": "pebble config layer for dex-auth-operator",
+            "services": {
+                self._container_name: {
+                    "override": "replace",
+                    "summary": "entrypoint of the dex-auth-operator image",
+                    "command": f"{self._entrypoint}",
+                    "startup": "enabled",
+                    "environment": {
+                        "USERID_HEADER": "kubeflow-userid",
+                        "USERID_PREFIX": "",
+                        "PROFILES_KFAM_SERVICE_HOST": f"{profiles_service}.{self.model.name}",
+                        "REGISTRATION_FLOW": self.model.config["registration-flow"],
+                        "DASHBOARD_LINKS_CONFIGMAP": self.model.config[
+                            "dashboard-configmap"
+                        ],
                     },
-                },
-                "kubernetesResources": {
-                    "customResources": {
-                        "profiles.kubeflow.org": [
-                            {
-                                "apiVersion": "kubeflow.org/v1beta1",
-                                "kind": "Profile",
-                                "metadata": {"name": config["profile"]},
-                                "spec": {
-                                    "owner": {"kind": "User", "name": config["profile"]}
-                                },
-                            }
-                        ]
-                    },
-                },
-            },
-        )
-
-        self.model.unit.status = ActiveStatus()
-
-    def _on_sidepanel_relation_changed(self, event: RelationChangedEvent):
-        try:
-            self._check_leader()
-        except CheckFailed as check_failed:
-            self.model.unit.status = check_failed.status
-            return
-        if event.app.name in SIDEBAR_EXTRA_OPTIONS:
-            self.log.info(f"ADDING {event.app.name} to side panel")
-            side_bar_tabs_dict = json.loads(self._stored.side_bar_tabs)
-            if (
-                SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
-                not in side_bar_tabs_dict["menuLinks"]
-            ):
-                side_bar_tabs_dict["menuLinks"].append(
-                    SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
-                )
-                self.log.info(f"NEW SIDE BAR {side_bar_tabs_dict}")
-                self._stored.side_bar_tabs = json.dumps(side_bar_tabs_dict)
-                self.main(event)
-
-    def _on_sidepanel_relation_broken(self, event: RelationBrokenEvent):
-        try:
-            self._check_leader()
-        except CheckFailed as check_failed:
-            self.model.unit.status = check_failed.status
-            return
-        if event.app.name in SIDEBAR_EXTRA_OPTIONS:
-            self.log.info(f"REMOVING {event.app.name} to side panel")
-            side_bar_tabs_dict = json.loads(self._stored.side_bar_tabs)
-            side_bar_tabs_dict["menuLinks"] = [
-                link
-                for link in side_bar_tabs_dict["menuLinks"]
-                if link != SIDEBAR_EXTRA_OPTIONS[event.app.name]["menuLink"]
-            ]
-            self.log.info(f"NEW SIDE BAR {side_bar_tabs_dict}")
-            self._stored.side_bar_tabs = json.dumps(side_bar_tabs_dict)
-            self.main(event)
-
-    def _configure_mesh(self, interfaces):
-        if interfaces["ingress"]:
-            interfaces["ingress"].send_data(
-                {
-                    "prefix": "/",
-                    "rewrite": "/",
-                    "service": self.model.app.name,
-                    "port": self.model.config["port"],
                 }
-            )
+            },
+        }
+        return Layer(layer_config)
 
-    def _generate_config_hash(self):
-        """Returns a hash of the current config state"""
-        # Add a randomly generated salt to the config to make it hard to reverse engineer the
-        # secret-key from the password.
-        salt = self._stored.hash_salt
-        all_config = tuple(
-            str(self.model.config[name]) for name in sorted(self.model.config.keys())
-        ) + (salt,)
-        config_hash = sha256(".".join(all_config).encode("utf-8"))
-        return config_hash.hexdigest()
+    def _check_container_connection(self):
+        if not self._container.can_connect():
+            raise CheckFailed("Waiting for pod startup to complete", WaitingStatus)
 
     def _check_model_name(self):
         if self.model.name != "kubeflow":
@@ -247,6 +119,30 @@ class Operator(CharmBase):
             # We can't do anything useful when not the leader, so do nothing.
             raise CheckFailed("Waiting for leadership", WaitingStatus)
 
+    def _update_layer(self, profiles_service: str) -> None:
+        """Updates the Pebble configuration layer if changed."""
+        try:
+            self._check_container_connection()
+        except CheckFailed as e:
+            self.logger.error(traceback.format_exc())
+            self.model.unit.status = e.status
+            return
+
+        current_layer = self._container.get_plan()
+        new_layer = self.get_kubeflow_dashboard_operator_layer(profiles_service)
+        if current_layer.services != new_layer.services:
+            self.unit.status = MaintenanceStatus("Applying new pebble layer")
+            self._container.add_layer(self._container_name, new_layer, combine=True)
+            try:
+                self.logger.info(
+                    "Pebble plan updated with new configuration, replanning"
+                )
+                self._container.replan()
+            except ChangeError as e:
+                self.logger.error(traceback.format_exc())
+                self.unit.status = BlockedStatus("Failed to replan")
+                raise e
+
     def _get_interfaces(self):
         try:
             interfaces = get_interfaces(self)
@@ -256,12 +152,16 @@ class Operator(CharmBase):
             raise CheckFailed(err, BlockedStatus)
         return interfaces
 
-    def _check_image_details(self):
-        try:
-            image_details = self.image.fetch()
-        except OCIImageResourceError as e:
-            raise CheckFailed(f"{e.status_message}: oci-image", e.status_type)
-        return image_details
+    def handle_ingress(self, interfaces):
+        if interfaces["ingress"]:
+            interfaces["ingress"].send_data(
+                {
+                    "prefix": "/",
+                    "rewrite": "/",
+                    "service": self.model.app.name,
+                    "port": self.model.config["port"],
+                }
+            )
 
     def _check_kf_profiles(self, interfaces):
         if not (
@@ -273,10 +173,48 @@ class Operator(CharmBase):
 
         return kf_profiles
 
+    def _create_resources(self, resource_type=None) -> None:
+        """Creates the resources for the charm."""
+        if resource_type is None:
+            resource_type = self._resource_files.keys()
+        for resource_type in resource_type:
+            resource_file = self._resource_files[resource_type]
+            manifest = self.env.get_template(resource_file).render(self._context)
+            objs = codecs.load_all_yaml(manifest)
+            try:
+                apply_many(self.lightkube_client, objs, self.lightkube_field_manager)
+            except ApiError as e:
+                self.logger.error(traceback.format_exc())
+                self.unit.status = BlockedStatus(
+                    f"Applying resources failed with code {str(e.status.code)}."
+                )
+                if e.status.code == 403:
+                    self.logger.error(
+                        "Received Forbidden (403) error when creating auth resources."
+                        "This may be due to the charm lacking permissions to create"
+                        "cluster-scoped resources."
+                        "Charm must be deployed with --trust"
+                    )
+                raise e
+        self.unit.status = ActiveStatus()
 
-def _gen_pass() -> str:
-    return "".join(choices(ascii_uppercase + digits, k=30))
+    def main(self, event):
+        """Main entry point for the Charm."""
+        try:
+            self._check_model_name()
+            self._check_leader()
+            interfaces = self._get_interfaces()
+            kf_profiles = self._check_kf_profiles(interfaces)
+        except CheckFailed as e:
+            self.model.unit.status = e.status
+            return
+        self.handle_ingress(interfaces)
+        kf_profiles = list(kf_profiles.get_data().values())[0]
+        profiles_service = kf_profiles["service-name"]
+        self._update_layer(profiles_service)
+        self._create_resources()
+        self.model.unit.status = ActiveStatus()
 
 
 if __name__ == "__main__":
-    main(Operator)
+    main(KubeflowDashboardOperator)
