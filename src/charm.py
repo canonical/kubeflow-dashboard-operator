@@ -9,7 +9,6 @@ import traceback
 from pathlib import Path
 
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
-from charmed_kubeflow_chisme.lightkube.batch import apply_many
 from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
 from lightkube.generic_resource import create_global_resource
@@ -23,7 +22,7 @@ from serialized_data_interface import (
     get_interfaces,
 )
 
-BASE_SIDEBAR = json.loads(Path("src/config.json").read_text())
+BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 
 
 class CheckFailed(Exception):
@@ -52,22 +51,21 @@ class KubeflowDashboardOperator(CharmBase):
         create_global_resource(
             group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
         )
-        self.env = Environment(loader=FileSystemLoader("src"))
+        self.env = Environment(loader=FileSystemLoader("src/templates"))
         self._name = self.model.app.name
         self._entrypoint = "npm start > michal_hucko.logs"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
-            "crds": "crds_manifests.yaml",
-            # "service_accounts":  "service_account.yaml",
-            "config_maps": "configmaps_manifests.yaml",
+            "profiles": "profile_crds.yaml.j2",
+            "config_maps": "configmaps.yaml.j2",
         }
         self._context = {
             "namespace": self._namespace,
             "configmap_name": self.model.config["dashboard-configmap"],
             "profilename": self.model.config["profile"],
-            "links": Path("src/config.json").read_text(),
-            "settings": json.dumps({'DASHBOARD_FORCE_IFRAME': True}),
+            "links": BASE_SIDEBAR,
+            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
         self.service_patcher = KubernetesServicePatch(
             self, [(self._container_name, self.model.config["port"])]
@@ -82,7 +80,6 @@ class KubeflowDashboardOperator(CharmBase):
             self.on.kubeflow_dashboard_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
-        self.logger.info("INIT DONE")
 
     def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
         """Returns a pre-configured Pebble layer."""
@@ -124,12 +121,10 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _check_leader(self):
         if not self.unit.is_leader():
-            # We can't do anything useful when not the leader, so do nothing.
             raise CheckFailed("Waiting for leadership", WaitingStatus)
 
     def _update_layer(self, profiles_service: str) -> None:
         """Updates the Pebble configuration layer if changed."""
-        self.logger.info("STARTING PEBBLE UPDATE")
         try:
             self._check_container_connection()
         except CheckFailed as e:
@@ -189,48 +184,48 @@ class KubeflowDashboardOperator(CharmBase):
             resource_type = self._resource_files.keys()
         for resource_type in resource_type:
             resource_file = self._resource_files[resource_type]
-            self.logger.info(f"CONTEXT IS {self._context}")
             manifest = self.env.get_template(resource_file).render(self._context)
-            objs = codecs.load_all_yaml(manifest)
-            self.logger.info(f"OBJS are {objs}")
-            try:
-                apply_many(self.lightkube_client, objs, self.lightkube_field_manager)
-            except ApiError as e:
-                self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus(
-                    f"Applying resources failed with code {str(e.status.code)}."
-                )
-                if e.status.code == 403:
-                    self.logger.error(
-                        "Received Forbidden (403) error when creating auth resources."
-                        "This may be due to the charm lacking permissions to create"
-                        "cluster-scoped resources."
-                        "Charm must be deployed with --trust"
-                    )
-                raise e
-        self.unit.status = ActiveStatus()
+            for obj in codecs.load_all_yaml(manifest):
+                try:
+                    self.lightkube_client.create(obj)
+                except ApiError as e:
+                    if e.status.code == 409:
+                        self.logger.info("replacing resource: %s.", str(obj.to_dict()))
+                        self.logger.debug(f"manifest is {manifest}")
+                        try:
+                            self.lightkube_client.replace(obj)
+                        except ApiError as e:
+                            if e.status.code == 409:
+                                self.logger.info(
+                                    "Unable to replace resource: %s. Skipping.",
+                                    str(obj.to_dict()),
+                                )
+                    else:
+                        self.logger.debug(
+                            "failed to create resource: %s.", str(obj.to_dict())
+                        )
+                        raise
+        return True
 
     def main(self, event):
-        self.logger.info("RUNNING MAIN")
         """Main entry point for the Charm."""
         try:
             self._check_model_name()
             self._check_leader()
             interfaces = self._get_interfaces()
-            self.logger.info(f"Got interfaces {interfaces}")
             kf_profiles = self._check_kf_profiles(interfaces)
         except CheckFailed as e:
-            # self.logger.error(traceback.format_exc())
-            # self.logger.error("Error during interface setup")
             self.model.unit.status = e.status
             return
-        self.logger.info("PRE Ingress")
         self.handle_ingress(interfaces)
-        self.logger.info("INGRESS SETUP")
         kf_profiles = list(kf_profiles.get_data().values())[0]
         profiles_service = kf_profiles["service-name"]
         self._update_layer(profiles_service)
-        self._create_resources()
+        try:
+            self._create_resources()
+        except ApiError:
+            self.logger.error(traceback.format_exc())
+            self.unit.status = BlockedStatus("kubernetes resource creation failed")
         self.model.unit.status = ActiveStatus()
 
 
