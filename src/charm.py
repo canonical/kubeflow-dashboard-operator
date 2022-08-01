@@ -12,6 +12,7 @@ from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServ
 from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
 from lightkube.generic_resource import create_global_resource
+from lightkube.types import PatchType
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -125,13 +126,6 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _update_layer(self, profiles_service: str) -> None:
         """Updates the Pebble configuration layer if changed."""
-        try:
-            self._check_container_connection()
-        except CheckFailed as e:
-            self.logger.error(traceback.format_exc())
-            self.model.unit.status = e.status
-            return
-
         current_layer = self._container.get_plan()
         new_layer = self.get_kubeflow_dashboard_operator_layer(profiles_service)
         self.logger.info(f"NEW LAYER: {new_layer}")
@@ -193,23 +187,30 @@ class KubeflowDashboardOperator(CharmBase):
                         self.logger.info("replacing resource: %s.", str(obj.to_dict()))
                         self.logger.debug(f"manifest is {manifest}")
                         try:
-                            self.lightkube_client.replace(obj)
+                            self.lightkube_client.patch(
+                                type(obj),
+                                obj.metadata.name,
+                                obj,
+                                patch_type=PatchType.MERGE,
+                            )
                         except ApiError as e:
                             if e.status.code == 409:
                                 self.logger.info(
                                     "Unable to replace resource: %s. Skipping.",
                                     str(obj.to_dict()),
                                 )
+                            else:
+                                raise e
                     else:
                         self.logger.debug(
                             "failed to create resource: %s.", str(obj.to_dict())
                         )
-                        raise
-        return True
+                        raise e
 
     def main(self, event):
         """Main entry point for the Charm."""
         try:
+            self._check_container_connection()
             self._check_model_name()
             self._check_leader()
             interfaces = self._get_interfaces()
@@ -222,6 +223,7 @@ class KubeflowDashboardOperator(CharmBase):
         profiles_service = kf_profiles["service-name"]
         self._update_layer(profiles_service)
         try:
+            self.unit.status = MaintenanceStatus("Creating k8s resources")
             self._create_resources()
         except ApiError:
             self.logger.error(traceback.format_exc())
