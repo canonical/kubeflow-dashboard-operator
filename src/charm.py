@@ -8,9 +8,11 @@ import traceback
 
 from pathlib import Path
 
+from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charmed_kubeflow_chisme.lightkube.batch import apply_many
 from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
+from lightkube.generic_resource import create_global_resource
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -39,17 +41,20 @@ class KubeflowDashboardOperator(CharmBase):
     """A Juju Charm for Kubeflow Dashboard Operator"""
 
     def __init__(self, *args):
-        super.__init__(self, *args)
+        super().__init__(*args)
 
         self.logger = logging.getLogger(__name__)
+        self._namespace = self.model.name
         self.lightkube_field_manager = "lightkube"
         self.lightkube_client = Client(
             namespace=self._namespace, field_manager=self.lightkube_field_manager
         )
+        create_global_resource(
+            group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
+        )
         self.env = Environment(loader=FileSystemLoader("src"))
         self._name = self.model.app.name
-        self._namespace = self.model.name
-        self._entrypoint = "npm start"
+        self._entrypoint = "npm start > michal_hucko.logs"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
@@ -62,29 +67,32 @@ class KubeflowDashboardOperator(CharmBase):
             "configmap_name": self.model.config["dashboard-configmap"],
             "profilename": self.model.config["profile"],
             "links": Path("src/config.json").read_text(),
-            "settings": json.dumps(
-                {
-                    "DASHBOARD_FORCE_IFRAME": True,
-                }
-            ),
+            "settings": json.dumps({'DASHBOARD_FORCE_IFRAME': True}),
         }
+        self.service_patcher = KubernetesServicePatch(
+            self, [(self._container_name, self.model.config["port"])]
+        )
         for event in [
             self.on.install,
+            self.on.leader_elected,
+            self.on.upgrade_charm,
             self.on.config_changed,
-            self.on.ingress_relation_changed,
-            self.on.knative_operator_pebble_ready,
+            self.on["kubeflow-profiles"].relation_changed,
+            self.on["ingress"].relation_changed,
+            self.on.kubeflow_dashboard_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
+        self.logger.info("INIT DONE")
 
     def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
         """Returns a pre-configured Pebble layer."""
         layer_config = {
             "summary": "dex-auth-operator layer",
-            "description": "pebble config layer for dex-auth-operator",
+            "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
                 self._container_name: {
                     "override": "replace",
-                    "summary": "entrypoint of the dex-auth-operator image",
+                    "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": f"{self._entrypoint}",
                     "startup": "enabled",
                     "environment": {
@@ -121,6 +129,7 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _update_layer(self, profiles_service: str) -> None:
         """Updates the Pebble configuration layer if changed."""
+        self.logger.info("STARTING PEBBLE UPDATE")
         try:
             self._check_container_connection()
         except CheckFailed as e:
@@ -130,6 +139,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         current_layer = self._container.get_plan()
         new_layer = self.get_kubeflow_dashboard_operator_layer(profiles_service)
+        self.logger.info(f"NEW LAYER: {new_layer}")
         if current_layer.services != new_layer.services:
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
             self._container.add_layer(self._container_name, new_layer, combine=True)
@@ -137,7 +147,7 @@ class KubeflowDashboardOperator(CharmBase):
                 self.logger.info(
                     "Pebble plan updated with new configuration, replanning"
                 )
-                self._container.replan()
+                self._container.restart(self._container_name)
             except ChangeError as e:
                 self.logger.error(traceback.format_exc())
                 self.unit.status = BlockedStatus("Failed to replan")
@@ -179,8 +189,10 @@ class KubeflowDashboardOperator(CharmBase):
             resource_type = self._resource_files.keys()
         for resource_type in resource_type:
             resource_file = self._resource_files[resource_type]
+            self.logger.info(f"CONTEXT IS {self._context}")
             manifest = self.env.get_template(resource_file).render(self._context)
             objs = codecs.load_all_yaml(manifest)
+            self.logger.info(f"OBJS are {objs}")
             try:
                 apply_many(self.lightkube_client, objs, self.lightkube_field_manager)
             except ApiError as e:
@@ -199,16 +211,22 @@ class KubeflowDashboardOperator(CharmBase):
         self.unit.status = ActiveStatus()
 
     def main(self, event):
+        self.logger.info("RUNNING MAIN")
         """Main entry point for the Charm."""
         try:
             self._check_model_name()
             self._check_leader()
             interfaces = self._get_interfaces()
+            self.logger.info(f"Got interfaces {interfaces}")
             kf_profiles = self._check_kf_profiles(interfaces)
         except CheckFailed as e:
+            # self.logger.error(traceback.format_exc())
+            # self.logger.error("Error during interface setup")
             self.model.unit.status = e.status
             return
+        self.logger.info("PRE Ingress")
         self.handle_ingress(interfaces)
+        self.logger.info("INGRESS SETUP")
         kf_profiles = list(kf_profiles.get_data().values())[0]
         profiles_service = kf_profiles["service-name"]
         self._update_layer(profiles_service)
