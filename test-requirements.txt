@@ -5,4 +5,5 @@ black
 flake8
 flake8-copyright<0.3
 pytest
+pytest-asyncio
 selenium==3.141.0
