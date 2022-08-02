@@ -250,12 +250,12 @@ class KubeflowDashboardOperator(CharmBase):
     def _on_sidebar_relation_changed(self, event: RelationChangedEvent) -> None:
         if not self.unit.is_leader():
             return
-        new_config_link = event.relation.data[event.app].get("config")
-        if new_config_link is None:
+        new_config_string = event.relation.data[event.app].get("config")
+        if new_config_string is None:
             self.logger.info("No config link found in relation data")
             return
         try:
-            self.unit.status = MaintenanceStatus("Adjusting sidabar configmap")
+            self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
             current_configmap = self.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
@@ -265,8 +265,9 @@ class KubeflowDashboardOperator(CharmBase):
                 f"PROBLEM during configmap retrieval {e}. USING BASE CONFIG"
             )
             old_sidebar_config = json.loads(BASE_SIDEBAR)
+        new_config_link = json.loads(new_config_string)
         if new_config_link not in old_sidebar_config["menuLinks"]:
-            old_sidebar_config["menuLinks"].append(json.loads(new_config_link))
+            old_sidebar_config["menuLinks"].append(new_config_link)
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
                 self._create_resources(resource_type=["config_maps"])
@@ -282,7 +283,7 @@ class KubeflowDashboardOperator(CharmBase):
             return
         self.logger.info(f"{event.app.name} relation broken")
         try:
-            self.unit.status = MaintenanceStatus("Adjusting sidabar configmap")
+            self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
             current_configmap = self.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
