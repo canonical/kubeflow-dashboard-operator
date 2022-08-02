@@ -232,7 +232,16 @@ class KubeflowDashboardOperator(CharmBase):
         self._update_layer(profiles_service)
         try:
             self.unit.status = MaintenanceStatus("Creating k8s resources")
-            self._create_resources()
+            try:
+                current_configmap = self.lightkube_client.get(
+                    ConfigMap, name=self._context["configmap_name"]
+                )
+            except Exception as e:
+                self.logger.info(f"ConfigMap not found: {e}. Creating one")
+                self._create_resources()
+            else:
+                self.logger.info(f"ConfigMap found: {current_configmap}. Reusing it")
+                self._create_resources(["profiles"])
         except ApiError:
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
@@ -246,6 +255,7 @@ class KubeflowDashboardOperator(CharmBase):
             self.logger.info("No config link found in relation data")
             return
         try:
+            self.unit.status = MaintenanceStatus("Adjusting sidabar configmap")
             current_configmap = self.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
@@ -259,7 +269,6 @@ class KubeflowDashboardOperator(CharmBase):
             old_sidebar_config["menuLinks"].append(json.loads(new_config_link))
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
-                self.unit.status = MaintenanceStatus("Creating k8s resources")
                 self._create_resources(resource_type=["config_maps"])
             except ApiError:
                 self.logger.error(traceback.format_exc())
@@ -273,6 +282,7 @@ class KubeflowDashboardOperator(CharmBase):
             return
         self.logger.info(f"{event.app.name} relation broken")
         try:
+            self.unit.status = MaintenanceStatus("Adjusting sidabar configmap")
             current_configmap = self.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
@@ -292,7 +302,6 @@ class KubeflowDashboardOperator(CharmBase):
             old_sidebar_config["menuLinks"] = new_menu_links
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
-                self.unit.status = MaintenanceStatus("Creating k8s resources")
                 self._create_resources(resource_type=["config_maps"])
             except ApiError:
                 self.logger.error(traceback.format_exc())
