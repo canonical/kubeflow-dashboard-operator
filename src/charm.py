@@ -5,6 +5,7 @@
 import json
 import logging
 import traceback
+from typing import List
 
 from pathlib import Path
 
@@ -13,7 +14,8 @@ from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
 from lightkube.generic_resource import create_global_resource
 from lightkube.types import PatchType
-from ops.charm import CharmBase
+from lightkube.resources.core_v1 import ConfigMap
+from ops.charm import CharmBase, RelationChangedEvent, RelationBrokenEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
@@ -81,6 +83,12 @@ class KubeflowDashboardOperator(CharmBase):
             self.on.kubeflow_dashboard_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
+        self.framework.observe(
+            self.on.sidebar_relation_changed, self._on_sidebar_relation_changed
+        )
+        self.framework.observe(
+            self.on.sidebar_relation_broken, self._on_sidebar_relation_broken
+        )
 
     def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
         """Returns a pre-configured Pebble layer."""
@@ -172,7 +180,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
-    def _create_resources(self, resource_type=None) -> None:
+    def _create_resources(self, resource_type: List[str] = None) -> None:
         """Creates the resources for the charm."""
         if resource_type is None:
             resource_type = self._resource_files.keys()
@@ -207,7 +215,7 @@ class KubeflowDashboardOperator(CharmBase):
                         )
                         raise e
 
-    def main(self, event):
+    def main(self, event) -> None:
         """Main entry point for the Charm."""
         try:
             self._check_container_connection()
@@ -229,6 +237,67 @@ class KubeflowDashboardOperator(CharmBase):
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
         self.model.unit.status = ActiveStatus()
+
+    def _on_sidebar_relation_changed(self, event: RelationChangedEvent) -> None:
+        if not self.unit.is_leader():
+            return
+        new_config_link = event.relation.data[event.app].get("config")
+        if new_config_link is None:
+            self.logger.info("No config link found in relation data")
+            return
+        try:
+            current_configmap = self.lightkube_client.get(
+                ConfigMap, name=self._context["configmap_name"]
+            )
+            old_sidebar_config = json.loads(current_configmap.data["links"])
+        except Exception as e:
+            self.logger.info(
+                f"PROBLEM during configmap retrieval {e}. USING BASE CONFIG"
+            )
+            old_sidebar_config = json.loads(BASE_SIDEBAR)
+        if new_config_link not in old_sidebar_config["menuLinks"]:
+            old_sidebar_config["menuLinks"].append(json.loads(new_config_link))
+            self._context["links"] = json.dumps(old_sidebar_config)
+            try:
+                self.unit.status = MaintenanceStatus("Creating k8s resources")
+                self._create_resources(resource_type=["config_maps"])
+            except ApiError:
+                self.logger.error(traceback.format_exc())
+                self.unit.status = BlockedStatus("kubernetes resource creation failed")
+            self.model.unit.status = ActiveStatus()
+        else:
+            self.logger.info(f"{new_config_link} already exists in configmap")
+
+    def _on_sidebar_relation_broken(self, event: RelationBrokenEvent) -> None:
+        if not self.unit.is_leader():
+            return
+        self.logger.info(f"{event.app.name} relation broken")
+        try:
+            current_configmap = self.lightkube_client.get(
+                ConfigMap, name=self._context["configmap_name"]
+            )
+            old_sidebar_config = json.loads(current_configmap.data["links"])
+        except Exception as e:
+            self.logger.info(
+                f"PROBLEM during configmap retrieval {e}. USING BASE CONFIG"
+            )
+            old_sidebar_config = json.loads(BASE_SIDEBAR)
+
+        new_menu_links = [
+            conf
+            for conf in old_sidebar_config["menuLinks"]
+            if conf.get("app", None) != event.app.name
+        ]
+        if len(new_menu_links) != len(old_sidebar_config["menuLinks"]):
+            old_sidebar_config["menuLinks"] = new_menu_links
+            self._context["links"] = json.dumps(old_sidebar_config)
+            try:
+                self.unit.status = MaintenanceStatus("Creating k8s resources")
+                self._create_resources(resource_type=["config_maps"])
+            except ApiError:
+                self.logger.error(traceback.format_exc())
+                self.unit.status = BlockedStatus("kubernetes resource creation failed")
+            self.model.unit.status = ActiveStatus()
 
 
 if __name__ == "__main__":
