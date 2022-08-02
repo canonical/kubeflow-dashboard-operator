@@ -102,6 +102,7 @@ async def driver(request, ops_test):
         driver.get_screenshot_as_file(f"/tmp/selenium-{request.node.name}.png")
 
 
+@pytest.mark.asyncio
 def test_links(driver):
     driver, wait, url = driver
 
