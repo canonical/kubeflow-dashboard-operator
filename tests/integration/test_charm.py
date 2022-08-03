@@ -12,15 +12,16 @@ from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from pytest_operator.plugin import OpsTest
 
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test):
+async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
@@ -43,7 +44,7 @@ async def test_build_and_deploy(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_add_profile_relation(ops_test):
+async def test_add_profile_relation(ops_test: OpsTest):
     charm_name = METADATA["name"]
     await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
     await ops_test.model.add_relation("kubeflow-profiles", charm_name)
@@ -56,17 +57,17 @@ async def test_add_profile_relation(ops_test):
     )
 
 
-async def test_status(ops_test):
+async def test_status(ops_test: OpsTest):
     charm_name = METADATA["name"]
     assert ops_test.model.applications[charm_name].units[0].workload_status == "active"
 
 
-async def test_configmap_exist(ops_test):
+async def test_configmap_exist(ops_test: OpsTest):
     configmap = Client().get(ConfigMap, "centraldashboard-config")
     assert configmap is not None
 
 
-async def test_configmap_contents(ops_test):
+async def test_configmap_contents(ops_test: OpsTest):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     configmap = Client().get(ConfigMap, "centraldashboard-config")
     links = json.loads(configmap.data["links"])
@@ -74,7 +75,7 @@ async def test_configmap_contents(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_add_sidebar_tensorboard_relation(ops_test):
+async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     charm_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/tensorboards-web-app_ubuntu-20.04-amd64.charm"
     metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
     metadata = yaml.safe_load(Path(metadata_path).read_text())
@@ -94,7 +95,7 @@ async def test_add_sidebar_tensorboard_relation(ops_test):
     )
 
 
-async def test_link_added_on_new_sidebar_relation(ops_test):
+async def test_link_added_on_new_sidebar_relation(ops_test: OpsTest):
     metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
     metadata = yaml.safe_load(Path(metadata_path).read_text())
     tensorboard_charm_name = metadata["name"]
@@ -112,7 +113,7 @@ async def test_link_added_on_new_sidebar_relation(ops_test):
     assert links == base_links
 
 
-async def test_link_removed_on_removed_sidebar_relation(ops_test):
+async def test_link_removed_on_removed_sidebar_relation(ops_test: OpsTest):
     metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
     metadata = yaml.safe_load(Path(metadata_path).read_text())
     tensorboard_charm_name = metadata["name"]
@@ -136,112 +137,102 @@ async def test_link_removed_on_removed_sidebar_relation(ops_test):
     assert links == expected_links
 
 
-# @pytest.mark.abort_on_fail
-# async def test_add_sidebar_relation(ops_test):
+def fix_queryselector(elems):
+    """Workaround for web components breaking querySelector.
+    Because someone thought it was a good idea to just yeet the moral equivalent
+    of iframes everywhere over a single page 🤦
+    Shadow DOM was a terrible idea and everyone involved should feel professionally
+    ashamed of themselves. Every problem it tried to solved could and should have
+    been solved in better ways that don't break the DOM.
+    """
+
+    selectors = '").shadowRoot.querySelector("'.join(elems)
+    return 'return document.querySelector("' + selectors + '")'
 
 
-# def fix_queryselector(elems):
-#     """Workaround for web components breaking querySelector.
+@pytest.fixture()
+async def driver(request, ops_test):
+    status = yaml.safe_load(
+        check_output(
+            ["juju", "status", "-m", ops_test.model_full_name, "--format=yaml"]
+        )
+    )
+    endpoint = status["applications"]["kubeflow-dashboard"]["address"]
+    application = ops_test.model.applications["kubeflow-dashboard"]
+    config = await application.get_config()
+    port = config["port"]["value"]
+    url = f"http://{endpoint}.nip.io:{port}/"
+    options = Options()
+    options.headless = True
 
-#     Because someone thought it was a good idea to just yeet the moral equivalent
-#     of iframes everywhere over a single page 🤦
+    with webdriver.Chrome(options=options) as driver:
+        driver.delete_all_cookies()
+        wait = WebDriverWait(driver, 180, 1, (JavascriptException, StopIteration))
+        for _ in range(60):
+            try:
+                driver.get(url)
+                break
+            except WebDriverException:
+                sleep(5)
+        else:
+            driver.get(url)
 
-#     Shadow DOM was a terrible idea and everyone involved should feel professionally
-#     ashamed of themselves. Every problem it tried to solved could and should have
-#     been solved in better ways that don't break the DOM.
-#     """
+        yield driver, wait, url
 
-#     selectors = '").shadowRoot.querySelector("'.join(elems)
-#     return 'return document.querySelector("' + selectors + '")'
-
-
-# @pytest.fixture()
-# async def driver(request, ops_test):
-#     status = yaml.safe_load(
-#         check_output(
-#             ["juju", "status", "-m", ops_test.model_full_name, "--format=yaml"]
-#         )
-#     )
-#     endpoint = status["applications"]["kubeflow-dashboard"]["address"]
-#     application = ops_test.model.applications["kubeflow-dashboard"]
-#     config = await application.get_config()
-#     port = config["port"]["value"]
-#     url = f"http://{endpoint}.nip.io:{port}/"
-#     options = Options()
-#     options.headless = True
-
-#     with webdriver.Firefox(options=options) as driver:
-#         wait = WebDriverWait(driver, 180, 1, (JavascriptException, StopIteration))
-#         for _ in range(60):
-#             try:
-#                 driver.get(url)
-#                 break
-#             except WebDriverException:
-#                 sleep(5)
-#         else:
-#             driver.get(url)
-
-#         yield driver, wait, url
-
-#         driver.get_screenshot_as_file(f"/tmp/selenium-{request.node.name}.png")
+        driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
 
-# def test_links(driver):
-#     driver, wait, url = driver
+def test_links(driver):
+    driver, wait, url = driver
 
-#     # Ensure that sidebar links are set up properly
-#     links = [
-#         "/jupyter/",
-#         # "/katib/",  # katib no longer available in default sidebar
-#         "/pipeline/#/experiments",
-#         "/pipeline/#/pipelines",
-#         "/pipeline/#/runs",
-#         "/pipeline/#/recurringruns",
-#         # Removed temporarily until https://warthogs.atlassian.net/browse/KF-175 is fixed
-#         # "/pipeline/#/artifacts",
-#         # "/pipeline/#/executions",
-#         "/volumes/",
-#         # "/tensorboards/", # tensorboards no longer available in default sidebar
-#     ]
+    # Ensure that sidebar links are set up properly
+    links = [
+        "/jupyter/",
+        "/pipeline/#/experiments",
+        "/pipeline/#/pipelines",
+        "/pipeline/#/runs",
+        "/pipeline/#/recurringruns",
+        "/volumes/",
+    ]
 
-#     for link in links:
-#         print("Looking for link: %s" % link)
-#         script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
-#         wait.until(lambda x: x.execute_script(script))
+    for link in links:
+        print("Looking for link: %s" % link)
+        script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
+        wait.until(lambda x: x.execute_script(script))
 
-#     # Ensure that quick links are set up properly
-#     links = [
-#         "/pipeline/",
-#         "/pipeline/#/runs",
-#         "/jupyter/new?namespace=kubeflow",
-#         "/katib/",
-#     ]
+    # Ensure that quick links are set up properly
+    links = [
+        "/pipeline/",
+        "/pipeline/#/runs",
+        "/jupyter/new?namespace=kubeflow",
+        "/katib/",
+    ]
 
-#     for link in links:
-#         print("Looking for link: %s" % link)
-#         script = fix_queryselector(
-#             [
-#                 "main-page",
-#                 "dashboard-view",
-#                 f"iframe-link[href='{link}']",
-#             ]
-#         )
-#         wait.until(lambda x: x.execute_script(script))
+    for link in links:
+        print("Looking for link: %s" % link)
+        script = fix_queryselector(
+            [
+                "main-page",
+                "dashboard-view",
+                f"iframe-link[href='{link}']",
+            ]
+        )
+        wait.until(lambda x: x.execute_script(script))
 
-#     # Ensure that doc links are set up properly
-#     links = [
-#         "https://charmed-kubeflow.io/docs/kubeflow-basics",
-#         "https://microk8s.io/docs/addon-kubeflow",
-#         "https://www.kubeflow.org/docs/started/requirements/",
-#     ]
+    # Ensure that doc links are set up properly
+    links = [
+        "https://charmed-kubeflow.io/docs/kubeflow-basics",
+        "https://microk8s.io/docs/addon-kubeflow",
+        "https://www.kubeflow.org/docs/started/requirements/",
+    ]
 
-#     for link in links:
-#         print("Looking for link: %s" % link)
-#         script = fix_queryselector(
-#             [
-#                 "main-page",
-#                 "dashboard-view",
-#                 f"a[href='{link}']",
-#             ]
-#         )
-#         wait.until(lambda x: x.execute_script(script))
+    for link in links:
+        print("Looking for link: %s" % link)
+        script = fix_queryselector(
+            [
+                "main-page",
+                "dashboard-view",
+                f"a[href='{link}']",
+            ]
+        )
+        wait.until(lambda x: x.execute_script(script))
