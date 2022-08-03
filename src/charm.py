@@ -61,9 +61,11 @@ class KubeflowDashboardOperator(CharmBase):
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
             "profiles": "profile_crds.yaml.j2",
+            "auths": "auth_manifests.yaml.j2",
             "config_maps": "configmaps.yaml.j2",
         }
         self._context = {
+            "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self.model.config["dashboard-configmap"],
             "profilename": self.model.config["profile"],
@@ -226,13 +228,10 @@ class KubeflowDashboardOperator(CharmBase):
         except CheckFailed as e:
             self.model.unit.status = e.status
             return
-        self.handle_ingress(interfaces)
-        kf_profiles = list(kf_profiles.get_data().values())[0]
-        profiles_service = kf_profiles["service-name"]
-        self._update_layer(profiles_service)
         try:
             self.unit.status = MaintenanceStatus("Creating k8s resources")
             try:
+                self._create_resources(["auths"])
                 current_configmap = self.lightkube_client.get(
                     ConfigMap, name=self._context["configmap_name"]
                 )
@@ -245,6 +244,10 @@ class KubeflowDashboardOperator(CharmBase):
         except ApiError:
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
+        self.handle_ingress(interfaces)
+        kf_profiles = list(kf_profiles.get_data().values())[0]
+        profiles_service = kf_profiles["service-name"]
+        self._update_layer(profiles_service)
         self.model.unit.status = ActiveStatus()
 
     def _on_sidebar_relation_changed(self, event: RelationChangedEvent) -> None:
