@@ -21,11 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from pytest_operator.plugin import OpsTest
 
 
-BASE_LINKS = json.loads(Path("./src/config/sidebar_config.json").read_text())
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-CHARM_NAME = METADATA["name"]
-TENSORBOARD_CHARM_NAME = "tensorboards-web-app"
-PROFILES_CHARM_NAME = "kubeflow-profiles"
 
 
 @pytest.fixture()
@@ -38,8 +34,8 @@ async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, st
         "--format=yaml",
     )
     status = yaml.safe_load(tmp[1])
-    address = status["applications"][CHARM_NAME]["address"]
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
+    address = status["applications"]["kubeflow-dashboard"]["address"]
+    config = await ops_test.model.applications["kubeflow-dashboard"].get_config()
     port = config["port"]["value"]
     url = f"http://{address}.nip.io:{port}/"
     options = Options()
@@ -56,7 +52,9 @@ async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, st
                 sleep(5)
         else:
             driver.get(url)
+
         yield driver, wait, url
+
         driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
 
@@ -82,25 +80,27 @@ async def test_build_and_deploy(ops_test: OpsTest):
         my_charm, resources={"oci-image": image_path}, trust=True
     )
 
+    charm_name = METADATA["name"]
     await ops_test.model.wait_for_idle(
-        [CHARM_NAME],
+        [charm_name],
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "waiting"
+    assert ops_test.model.applications[charm_name].units[0].workload_status == "waiting"
     assert (
-        ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
+        ops_test.model.applications[charm_name].units[0].workload_status_message
         == "Waiting for kubeflow-profiles relation data"
     )
 
 
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
-    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
-    await ops_test.model.add_relation(PROFILES_CHARM_NAME, CHARM_NAME)
+    charm_name = METADATA["name"]
+    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
+    await ops_test.model.add_relation("kubeflow-profiles", charm_name)
     await ops_test.model.wait_for_idle(
-        [PROFILES_CHARM_NAME, CHARM_NAME],
+        ["kubeflow-profiles", charm_name],
         status="active",
         raise_on_blocked=True,
         raise_on_error=True,
@@ -109,7 +109,8 @@ async def test_add_profile_relation(ops_test: OpsTest):
 
 
 async def test_status(ops_test: OpsTest):
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
+    charm_name = METADATA["name"]
+    assert ops_test.model.applications[charm_name].units[0].workload_status == "active"
 
 
 async def test_configmap_exist():
@@ -187,30 +188,24 @@ async def test_default_sidebar_links_missing_tensoboards(
 
 
 async def test_configmap_contents(ops_test: OpsTest):
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
-    expected_links = BASE_LINKS
-    configmap = Client().get(ConfigMap, config["dashboard-configmap"]["value"])
+    expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
+    configmap = Client().get(ConfigMap, "centraldashboard-config")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
 
 @pytest.mark.abort_on_fail
 async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
-    # Change to concrete charm after publish ("tensorboard")
-    # COMMENT START
-    charm_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/tensorboards-web-app_ubuntu-20.04-amd64.charm"
-    metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
-    metadata = yaml.safe_load(Path(metadata_path).read_text())
-    image_path = metadata["resources"]["oci-image"]["upstream-source"]
-    await ops_test.model.deploy(charm_path, resources={"oci-image": image_path})
-    # COMMENT END use this
-    # await ops_test.model.deploy(TENSORBOARD_CHARM_NAME, channel="latest/edge", trust=True)
-
+    tensorboard_charm_name = "tensorboards-web-app"
+    charm_name = METADATA["name"]
+    await ops_test.model.deploy(
+        "tensorboard", channel="latest/edge", trust=True
+    )  # This assumes that the chages were merged
     await ops_test.model.add_relation(
-        f"{TENSORBOARD_CHARM_NAME}:sidebar", f"{CHARM_NAME}:sidebar"
+        f"{tensorboard_charm_name}:sidebar", f"{charm_name}:sidebar"
     )
     await ops_test.model.wait_for_idle(
-        [TENSORBOARD_CHARM_NAME, CHARM_NAME],
+        [tensorboard_charm_name],
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
@@ -218,18 +213,17 @@ async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
 
 
 async def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
+    tensorboard_charm_name = "tensorboards-web-app"
     tensorboard_link = {
-        "app": TENSORBOARD_CHARM_NAME,
+        "app": tensorboard_charm_name,
         "type": "item",
         "link": "/tensorboards/",
         "text": "Tensorboards",
         "icon": "assessment",
     }
-    base_links = BASE_LINKS
+    base_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     base_links["menuLinks"] = base_links["menuLinks"] + [tensorboard_link]
-    sleep(10)  # sometimes it takes a while for the configmap to be updated
-    configmap = Client().get(ConfigMap, config["dashboard-configmap"]["value"])
+    configmap = Client().get(ConfigMap, "centraldashboard-config")
     links = json.loads(configmap.data["links"])
     assert links == base_links
 
@@ -260,23 +254,23 @@ async def test_tensorboard_added_sidebar_links(
 async def test_configmap_link_removed_on_removed_sidebar_relation(
     ops_test: OpsTest, driver: Tuple[webdriver.Chrome, WebDriverWait, str]
 ):
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
-    expected_links = BASE_LINKS
+    tensorboard_charm_name = "tensorboards-web-app"
+    charm_name = METADATA["name"]
+    expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     await ops_test.run(
         "juju",
         "remove-relation",
-        f"{TENSORBOARD_CHARM_NAME}:sidebar",
-        f"{CHARM_NAME}:sidebar",
+        f"{tensorboard_charm_name}:sidebar",
+        f"{charm_name}:sidebar",
     )
     await ops_test.model.wait_for_idle(
-        [TENSORBOARD_CHARM_NAME, CHARM_NAME],
+        [charm_name],
         status="active",
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
-    sleep(10)  # sometimes it takes a while for the configmap to be updated
-    configmap = Client().get(ConfigMap, config["dashboard-configmap"]["value"])
+    configmap = Client().get(ConfigMap, "centraldashboard-config")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
     driver, wait, url = await driver.__anext__()
