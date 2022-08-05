@@ -79,9 +79,7 @@ class TestCharm:
     ):
         harness_with_relation.container_pebble_ready(CHARM_NAME)
         assert (
-            harness_with_relation.get_container_pebble_plan(
-                CHARM_NAME
-            )._services
+            harness_with_relation.get_container_pebble_plan(CHARM_NAME)._services
             is not None
         )
 
@@ -98,7 +96,9 @@ class TestCharm:
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator._create_resources")
-    def test_on_sidebar_relation_added(self, create_resources, harness_with_relation: Harness):
+    def test_on_sidebar_relation_added(
+        self, create_resources, harness_with_relation: Harness
+    ):
         rel_id = harness_with_relation.add_relation("sidebar", "tensorboards-web-app")
         harness_with_relation.add_relation_unit(rel_id, "tensorboards-web-app/0")
         harness_with_relation.begin_with_initial_hooks()
@@ -107,7 +107,9 @@ class TestCharm:
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator._create_resources")
-    def test_on_sidebar_relation_removed(self, create_resources, harness_with_relation: Harness):
+    def test_on_sidebar_relation_removed(
+        self, create_resources, harness_with_relation: Harness
+    ):
         rel_id = harness_with_relation.add_relation("sidebar", "tensorboards-web-app")
         harness_with_relation.add_relation_unit(rel_id, "tensorboards-web-app/0")
         harness_with_relation.remove_relation(rel_id)

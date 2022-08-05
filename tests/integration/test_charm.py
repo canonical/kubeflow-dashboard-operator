@@ -119,9 +119,7 @@ async def test_configmap_exist():
     assert configmap is not None
 
 
-def test_default_sidebar_links(
-    driver: Tuple[webdriver.Chrome, WebDriverWait, str]
-):
+def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
 
     # Ensure that sidebar links are set up properly
@@ -181,9 +179,9 @@ def test_default_sidebar_links(
 async def test_default_sidebar_links_missing_tensoboards(
     driver: Tuple[webdriver.Chrome, WebDriverWait, str]
 ):
-    driver, wait, url = await driver.__anext__()
+    driver, wait, url = driver
     with pytest.raises(TimeoutException):
-        script = fix_queryselector(["main-page", "iframe-link[href='/tensorboard/']"])
+        script = fix_queryselector(["main-page", "iframe-link[href='/tensorboards/']"])
         wait.until(lambda x: x.execute_script(script))
 
 
@@ -212,7 +210,7 @@ async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     )
 
 
-async def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
+def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
     tensorboard_charm_name = "tensorboards-web-app"
     tensorboard_link = {
         "app": tensorboard_charm_name,
@@ -232,7 +230,7 @@ async def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
 async def test_tensorboard_added_sidebar_links(
     driver: Tuple[webdriver.Chrome, WebDriverWait, str]
 ):
-    driver, wait, url = await driver.__anext__()
+    driver, wait, url = driver
 
     # Ensure that sidebar links are set up properly
     links = [
@@ -273,7 +271,7 @@ async def test_configmap_link_removed_on_removed_sidebar_relation(
     configmap = Client().get(ConfigMap, "centraldashboard-config")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
-    driver, wait, url = await driver.__anext__()
+    driver, wait, url = driver
     with pytest.raises(TimeoutException):
         script = fix_queryselector(["main-page", "iframe-link[href='/tensorboard/']"])
         wait.until(lambda x: x.execute_script(script))
