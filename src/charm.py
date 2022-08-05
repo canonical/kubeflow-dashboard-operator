@@ -5,6 +5,7 @@
 import json
 import logging
 import traceback
+from typing import List
 
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
 from lightkube.generic_resource import create_global_resource
 from lightkube.types import PatchType
+from lightkube.resources.core_v1 import ConfigMap
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
@@ -54,14 +56,16 @@ class KubeflowDashboardOperator(CharmBase):
         )
         self.env = Environment(loader=FileSystemLoader("src/templates"))
         self._name = self.model.app.name
-        self._entrypoint = "npm start > michal_hucko.logs"
+        self._entrypoint = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
             "profiles": "profile_crds.yaml.j2",
+            "auths": "auth_manifests.yaml.j2",
             "config_maps": "configmaps.yaml.j2",
         }
         self._context = {
+            "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self.model.config["dashboard-configmap"],
             "profilename": self.model.config["profile"],
@@ -134,12 +138,12 @@ class KubeflowDashboardOperator(CharmBase):
             self._container.add_layer(self._container_name, new_layer, combine=True)
             try:
                 self.logger.info(
-                    "Pebble plan updated with new configuration, replanning"
+                    "Pebble plan updated with new configuration, restarting"
                 )
                 self._container.restart(self._container_name)
             except ChangeError as e:
                 self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus("Failed to replan")
+                self.unit.status = BlockedStatus("Failed to restart")
                 raise e
 
     def _get_interfaces(self):
@@ -172,7 +176,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
-    def _create_resources(self, resource_type=None) -> None:
+    def _create_resources(self, resource_type: List[str] = None) -> None:
         """Creates the resources for the charm."""
         if resource_type is None:
             resource_type = self._resource_files.keys()
@@ -207,7 +211,7 @@ class KubeflowDashboardOperator(CharmBase):
                         )
                         raise e
 
-    def main(self, event):
+    def main(self, event) -> None:
         """Main entry point for the Charm."""
         try:
             self._check_container_connection()
@@ -218,16 +222,26 @@ class KubeflowDashboardOperator(CharmBase):
         except CheckFailed as e:
             self.model.unit.status = e.status
             return
+        try:
+            self.unit.status = MaintenanceStatus("Creating k8s resources")
+            try:
+                self._create_resources(["auths"])
+                current_configmap = self.lightkube_client.get(
+                    ConfigMap, name=self._context["configmap_name"]
+                )
+            except Exception as e:
+                self.logger.info(f"ConfigMap not found: {e}. Creating one")
+                self._create_resources()
+            else:
+                self.logger.info(f"ConfigMap found: {current_configmap}. Reusing it")
+                self._create_resources(["profiles"])
+        except ApiError:
+            self.logger.error(traceback.format_exc())
+            self.unit.status = BlockedStatus("kubernetes resource creation failed")
         self.handle_ingress(interfaces)
         kf_profiles = list(kf_profiles.get_data().values())[0]
         profiles_service = kf_profiles["service-name"]
         self._update_layer(profiles_service)
-        try:
-            self.unit.status = MaintenanceStatus("Creating k8s resources")
-            self._create_resources()
-        except ApiError:
-            self.logger.error(traceback.format_exc())
-            self.unit.status = BlockedStatus("kubernetes resource creation failed")
         self.model.unit.status = ActiveStatus()
 
 
