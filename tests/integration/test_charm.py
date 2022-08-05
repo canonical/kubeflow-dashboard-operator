@@ -2,26 +2,84 @@
 # See LICENSE file for licensing details.
 
 from pathlib import Path
-from subprocess import check_output
 from time import sleep
 
+import json
+from typing import Tuple
 import pytest
+import pytest_asyncio
 import yaml
+from lightkube import Client
+from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
-from selenium.common.exceptions import JavascriptException, WebDriverException
-from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import (
+    JavascriptException,
+    WebDriverException,
+    TimeoutException,
+)
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from pytest_operator.plugin import OpsTest
 
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
+@pytest_asyncio.fixture
+async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, str]:
+    tmp = await ops_test.run(
+        "juju",
+        "status",
+        "-m",
+        ops_test.model_name,
+        "--format=yaml",
+    )
+    status = yaml.safe_load(tmp[1])
+    address = status["applications"]["kubeflow-dashboard"]["address"]
+    config = await ops_test.model.applications["kubeflow-dashboard"].get_config()
+    port = config["port"]["value"]
+    url = f"http://{address}.nip.io:{port}/"
+    options = Options()
+    options.headless = True
+
+    with webdriver.Chrome(options=options) as driver:
+        driver.delete_all_cookies()
+        wait = WebDriverWait(driver, 20, 1, (JavascriptException, StopIteration))
+        for _ in range(60):
+            try:
+                driver.get(url)
+                break
+            except WebDriverException:
+                sleep(5)
+        else:
+            driver.get(url)
+
+        yield driver, wait, url
+
+        driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
+
+
+def fix_queryselector(elems):
+    """Workaround for web components breaking querySelector.
+    Because someone thought it was a good idea to just yeet the moral equivalent
+    of iframes everywhere over a single page 🤦
+    Shadow DOM was a terrible idea and everyone involved should feel professionally
+    ashamed of themselves. Every problem it tried to solved could and should have
+    been solved in better ways that don't break the DOM.
+    """
+
+    selectors = '").shadowRoot.querySelector("'.join(elems)
+    return 'return document.querySelector("' + selectors + '")'
+
+
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test):
+async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
-    await ops_test.model.deploy(my_charm, resources={"oci-image": image_path})
+    await ops_test.model.deploy(
+        my_charm, resources={"oci-image": image_path}, trust=True
+    )
 
     charm_name = METADATA["name"]
     await ops_test.model.wait_for_idle(
@@ -38,9 +96,9 @@ async def test_build_and_deploy(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_add_profile_relation(ops_test):
+async def test_add_profile_relation(ops_test: OpsTest):
     charm_name = METADATA["name"]
-    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
+    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
     await ops_test.model.add_relation("kubeflow-profiles", charm_name)
     await ops_test.model.wait_for_idle(
         ["kubeflow-profiles", charm_name],
@@ -51,73 +109,31 @@ async def test_add_profile_relation(ops_test):
     )
 
 
-async def test_status(ops_test):
+async def test_status(ops_test: OpsTest):
     charm_name = METADATA["name"]
     assert ops_test.model.applications[charm_name].units[0].workload_status == "active"
 
 
-def fix_queryselector(elems):
-    """Workaround for web components breaking querySelector.
-
-    Because someone thought it was a good idea to just yeet the moral equivalent
-    of iframes everywhere over a single page 🤦
-
-    Shadow DOM was a terrible idea and everyone involved should feel professionally
-    ashamed of themselves. Every problem it tried to solved could and should have
-    been solved in better ways that don't break the DOM.
-    """
-
-    selectors = '").shadowRoot.querySelector("'.join(elems)
-    return 'return document.querySelector("' + selectors + '")'
+async def test_configmap_exist():
+    configmap = Client().get(ConfigMap, "centraldashboard-config")
+    assert configmap is not None
 
 
-@pytest.fixture()
-async def driver(request, ops_test):
-    status = yaml.safe_load(
-        check_output(
-            ["juju", "status", "-m", ops_test.model_full_name, "--format=yaml"]
-        )
-    )
-    endpoint = status["applications"]["kubeflow-dashboard"]["address"]
-    application = ops_test.model.applications["kubeflow-dashboard"]
-    config = await application.get_config()
-    port = config["port"]["value"]
-    url = f"http://{endpoint}.nip.io:{port}/"
-    options = Options()
-    options.headless = True
-
-    with webdriver.Firefox(options=options) as driver:
-        wait = WebDriverWait(driver, 180, 1, (JavascriptException, StopIteration))
-        for _ in range(60):
-            try:
-                driver.get(url)
-                break
-            except WebDriverException:
-                sleep(5)
-        else:
-            driver.get(url)
-
-        yield driver, wait, url
-
-        driver.get_screenshot_as_file(f"/tmp/selenium-{request.node.name}.png")
-
-
-def test_links(driver):
+def test_default_sidebar_links(
+    driver: Tuple[webdriver.Chrome, WebDriverWait, str]
+):
     driver, wait, url = driver
 
     # Ensure that sidebar links are set up properly
     links = [
         "/jupyter/",
-        # "/katib/",  # katib no longer available in default sidebar
         "/pipeline/#/experiments",
         "/pipeline/#/pipelines",
         "/pipeline/#/runs",
         "/pipeline/#/recurringruns",
-        # Removed temporarily until https://warthogs.atlassian.net/browse/KF-175 is fixed
-        # "/pipeline/#/artifacts",
-        # "/pipeline/#/executions",
         "/volumes/",
-        # "/tensorboards/", # tensorboards no longer available in default sidebar
+        "/katib/",
+        "/tensorboards/"
     ]
 
     for link in links:
@@ -161,3 +177,10 @@ def test_links(driver):
             ]
         )
         wait.until(lambda x: x.execute_script(script))
+
+
+async def test_configmap_contents(ops_test: OpsTest):
+    expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
+    configmap = Client().get(ConfigMap, "centraldashboard-config")
+    links = json.loads(configmap.data["links"])
+    assert links == expected_links
