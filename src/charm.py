@@ -56,7 +56,7 @@ class KubeflowDashboardOperator(CharmBase):
         )
         self.env = Environment(loader=FileSystemLoader("src/templates"))
         self._name = self.model.app.name
-        self._entrypoint = "npm start > michal_hucko.logs"
+        self._entrypoint = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
@@ -144,12 +144,12 @@ class KubeflowDashboardOperator(CharmBase):
             self._container.add_layer(self._container_name, new_layer, combine=True)
             try:
                 self.logger.info(
-                    "Pebble plan updated with new configuration, replanning"
+                    "Pebble plan updated with new configuration, restarting"
                 )
                 self._container.restart(self._container_name)
             except ChangeError as e:
                 self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus("Failed to replan")
+                self.unit.status = BlockedStatus("Failed to restart")
                 raise e
 
     def _get_interfaces(self):

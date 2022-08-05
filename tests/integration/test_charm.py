@@ -7,6 +7,7 @@ from time import sleep
 import json
 from typing import Tuple
 import pytest
+import pytest_asyncio
 import yaml
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
@@ -24,7 +25,7 @@ from pytest_operator.plugin import OpsTest
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture
 async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, str]:
     tmp = await ops_test.run(
         "juju",
@@ -118,11 +119,10 @@ async def test_configmap_exist():
     assert configmap is not None
 
 
-@pytest.mark.asyncio
-async def test_default_sidebar_links(
+def test_default_sidebar_links(
     driver: Tuple[webdriver.Chrome, WebDriverWait, str]
 ):
-    driver, wait, url = await driver.__anext__()
+    driver, wait, url = driver
 
     # Ensure that sidebar links are set up properly
     links = [
