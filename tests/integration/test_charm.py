@@ -6,6 +6,7 @@ from subprocess import check_output
 from time import sleep
 
 import pytest
+import pytest_asyncio
 import yaml
 from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
@@ -71,7 +72,7 @@ def fix_queryselector(elems):
     return 'return document.querySelector("' + selectors + '")'
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture
 async def driver(request, ops_test):
     status = yaml.safe_load(
         check_output(
