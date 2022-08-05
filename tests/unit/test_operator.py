@@ -79,9 +79,7 @@ class TestCharm:
     ):
         harness_with_relation.container_pebble_ready(CHARM_NAME)
         assert (
-            harness_with_relation.get_container_pebble_plan(
-                CHARM_NAME
-            )._services
+            harness_with_relation.get_container_pebble_plan(CHARM_NAME)._services
             is not None
         )
 

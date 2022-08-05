@@ -15,7 +15,6 @@ from selenium import webdriver
 from selenium.common.exceptions import (
     JavascriptException,
     WebDriverException,
-    TimeoutException,
 )
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -119,9 +118,7 @@ async def test_configmap_exist():
     assert configmap is not None
 
 
-def test_default_sidebar_links(
-    driver: Tuple[webdriver.Chrome, WebDriverWait, str]
-):
+def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
 
     # Ensure that sidebar links are set up properly
@@ -133,7 +130,7 @@ def test_default_sidebar_links(
         "/pipeline/#/recurringruns",
         "/volumes/",
         "/katib/",
-        "/tensorboards/"
+        "/tensorboards/",
     ]
 
     for link in links:
