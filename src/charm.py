@@ -24,6 +24,7 @@ from serialized_data_interface import (
     NoVersionsListed,
     get_interfaces,
 )
+from typing import Optional
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 
@@ -48,9 +49,7 @@ class KubeflowDashboardOperator(CharmBase):
         self.logger = logging.getLogger(__name__)
         self._namespace = self.model.name
         self.lightkube_field_manager = "lightkube"
-        self.lightkube_client = Client(
-            namespace=self._namespace, field_manager=self.lightkube_field_manager
-        )
+        self._lightkube_client: Optional[Client] = None
         create_global_resource(
             group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
         )
@@ -91,6 +90,18 @@ class KubeflowDashboardOperator(CharmBase):
         self.framework.observe(
             self.on.sidebar_relation_broken, self._on_sidebar_relation_broken
         )
+
+    @property
+    def lightkube_client(self):
+        if not self._lightkube_client:
+            self._lightkube_client = Client(
+                namespace=self._namespace, field_manager=self.lightkube_field_manager
+            )
+        return self._lightkube_client
+
+    @lightkube_client.setter
+    def lightkube_client(self, client):
+        self._lightkube_client = client
 
     def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
         """Returns a pre-configured Pebble layer."""

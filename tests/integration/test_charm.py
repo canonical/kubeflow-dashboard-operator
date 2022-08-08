@@ -115,7 +115,7 @@ async def test_status(ops_test: OpsTest):
 
 
 async def test_configmap_exist():
-    configmap = Client().get(ConfigMap, "centraldashboard-config")
+    configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
     assert configmap is not None
 
 
@@ -187,7 +187,7 @@ async def test_default_sidebar_links_missing_tensoboards(
 
 async def test_configmap_contents(ops_test: OpsTest):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = Client().get(ConfigMap, "centraldashboard-config")
+    configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
