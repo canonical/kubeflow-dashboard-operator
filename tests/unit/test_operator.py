@@ -1,10 +1,13 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, Mock
+from unittest import mock
 
 import pytest
 import yaml
 
+from jinja2 import Environment, FileSystemLoader
+from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
 from ops.testing import Harness
@@ -131,12 +134,8 @@ class TestCharm:
         )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.Client.create")
-    def test_create_resources_success(
-        self, create: MagicMock, harness_with_relation: Harness
-    ):
-        harness_with_relation.begin_with_initial_hooks()
-        harness_with_relation.charm._context = {
+    def test_create_resources_success(self, harness_with_relation: Harness):
+        context = {
             "app_name": "kubeflow-dashboard",
             "namespace": "kubeflow",
             "configmap_name": "test-configmap",
@@ -144,51 +143,24 @@ class TestCharm:
             "links": "",
             "settings": "",
         }
-        try:
-            create.assert_called()
-            harness_with_relation.charm._create_resources()
-        except Exception as e:
-            pytest.fail(e)
+        resource_files = [
+            "profile_crds.yaml.j2",
+            "auth_manifests.yaml.j2",
+            "configmaps.yaml.j2",
+        ]
+        env = Environment(loader=FileSystemLoader("src/templates"))
+        expected_objects = []
+        for file in resource_files:
+            manifest = env.get_template(file).render(context)
+            for obj in codecs.load_all_yaml(manifest):
+                expected_objects.append(mock.call.create(obj))
 
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.Client.create")
-    @patch("charm.Client.patch")
-    def test_create_resources_patch(
-        self, patch: MagicMock, create: MagicMock, harness_with_relation: Harness
-    ):
-        harness_with_relation.begin_with_initial_hooks()
-        harness_with_relation.charm._context = {
-            "app_name": "kubeflow-dashboard",
-            "namespace": "kubeflow",
-            "configmap_name": "test-configmap",
-            "profilename": "test-profile",
-            "links": "",
-            "settings": "",
-        }
-        create.side_effect = _FakeApiError(code=409)
+        mocked_lightkube_client = Mock()
+        harness_with_relation.begin()
+        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        harness_with_relation.charm._context = context
         harness_with_relation.charm._create_resources()
-        patch.assert_called()
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.Client.create")
-    @patch("charm.Client.patch")
-    def test_create_resources_failure(
-        self, patch: MagicMock, create: MagicMock, harness_with_relation: Harness
-    ):
-        harness_with_relation.begin_with_initial_hooks()
-        harness_with_relation.charm._context = {
-            "app_name": "kubeflow-dashboard",
-            "namespace": "kubeflow",
-            "configmap_name": "test-configmap",
-            "profilename": "test-profile",
-            "links": "",
-            "settings": "",
-        }
-        create.side_effect = _FakeApiError(code=409)
-        patch.side_effect = _FakeApiError(code=410)
-        # any other error then 409 and 410 will fail the test
-        with pytest.raises(ApiError):
-            harness_with_relation.charm._create_resources()
+        mocked_lightkube_client.assert_has_calls(expected_objects)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator._create_resources")
