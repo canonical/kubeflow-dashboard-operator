@@ -5,14 +5,14 @@
 import json
 import logging
 import traceback
-from typing import List
+from typing import List, Optional
 
 from pathlib import Path
 
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from jinja2 import Environment, FileSystemLoader
 from lightkube import Client, ApiError, codecs
-from lightkube.generic_resource import create_global_resource
+from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.types import PatchType
 from lightkube.resources.core_v1 import ConfigMap
 from ops.charm import CharmBase
@@ -24,7 +24,6 @@ from serialized_data_interface import (
     NoVersionsListed,
     get_interfaces,
 )
-from typing import Optional
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 
@@ -48,14 +47,12 @@ class KubeflowDashboardOperator(CharmBase):
 
         self.logger = logging.getLogger(__name__)
         self._namespace = self.model.name
-        self.lightkube_field_manager = "lightkube"
+        self._lightkube_field_manager = "lightkube"
+        self._profiles_service = None
         self._lightkube_client: Optional[Client] = None
-        create_global_resource(
-            group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
-        )
         self.env = Environment(loader=FileSystemLoader("src/templates"))
         self._name = self.model.app.name
-        self._entrypoint = "npm start"
+        self._service = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
@@ -89,16 +86,25 @@ class KubeflowDashboardOperator(CharmBase):
     def lightkube_client(self):
         if not self._lightkube_client:
             self._lightkube_client = Client(
-                namespace=self._namespace, field_manager=self.lightkube_field_manager
+                namespace=self._namespace, field_manager=self._lightkube_field_manager
             )
+            load_in_cluster_generic_resources(self._lightkube_client)
         return self._lightkube_client
 
     @lightkube_client.setter
     def lightkube_client(self, client):
         self._lightkube_client = client
 
-    def get_kubeflow_dashboard_operator_layer(self, profiles_service: str) -> Layer:
-        """Returns a pre-configured Pebble layer."""
+    @property
+    def profiles_service(self):
+        return self._profiles_service
+
+    @profiles_service.setter
+    def profiles_service(self, service):
+        self._profiles_service = service
+
+    @property
+    def _kubeflow_dashboard_operator_layer(self) -> Layer:
         layer_config = {
             "summary": "dex-auth-operator layer",
             "description": "pebble config layer for kubeflow_dashboard_operator",
@@ -106,12 +112,12 @@ class KubeflowDashboardOperator(CharmBase):
                 self._container_name: {
                     "override": "replace",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
-                    "command": f"{self._entrypoint}",
+                    "command": self._service,
                     "startup": "enabled",
                     "environment": {
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
-                        "PROFILES_KFAM_SERVICE_HOST": f"{profiles_service}.{self.model.name}",
+                        "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
                         "REGISTRATION_FLOW": self.model.config["registration-flow"],
                         "DASHBOARD_LINKS_CONFIGMAP": self.model.config[
                             "dashboard-configmap"
@@ -139,23 +145,21 @@ class KubeflowDashboardOperator(CharmBase):
         if not self.unit.is_leader():
             raise CheckFailed("Waiting for leadership", WaitingStatus)
 
-    def _update_layer(self, profiles_service: str) -> None:
+    def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
         current_layer = self._container.get_plan()
-        new_layer = self.get_kubeflow_dashboard_operator_layer(profiles_service)
-        self.logger.info(f"NEW LAYER: {new_layer}")
+        new_layer = self._kubeflow_dashboard_operator_layer
+        self.logger.debug(f"NEW LAYER: {new_layer}")
         if current_layer.services != new_layer.services:
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
             self._container.add_layer(self._container_name, new_layer, combine=True)
             try:
                 self.logger.info(
-                    "Pebble plan updated with new configuration, restarting"
+                    "Pebble plan updated with new configuration, replaning"
                 )
-                self._container.restart(self._container_name)
-            except ChangeError as e:
-                self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus("Failed to restart")
-                raise e
+                self._container.replan()
+            except ChangeError:
+                raise CheckFailed("Failed to replan", BlockedStatus)
 
     def _get_interfaces(self):
         try:
@@ -196,7 +200,7 @@ class KubeflowDashboardOperator(CharmBase):
             manifest = self.env.get_template(resource_file).render(self._context)
             for obj in codecs.load_all_yaml(manifest):
                 try:
-                    self.lightkube_client.create(obj)
+                    self.lightkube_client.apply(obj)
                 except ApiError as e:
                     if e.status.code == 409:
                         self.logger.info("replacing resource: %s.", str(obj.to_dict()))
@@ -236,23 +240,30 @@ class KubeflowDashboardOperator(CharmBase):
         try:
             self.unit.status = MaintenanceStatus("Creating k8s resources")
             try:
-                self._create_resources(["auths"])
+                self._create_resources(["auths", "profiles"])
                 current_configmap = self.lightkube_client.get(
                     ConfigMap, name=self._context["configmap_name"]
                 )
-            except Exception as e:
-                self.logger.info(f"ConfigMap not found: {e}. Creating one")
-                self._create_resources()
+            except ApiError as e:
+                if e.status.code == 404:
+                    self.logger.info(f"ConfigMap not found: {e}. Creating one")
             else:
-                self.logger.info(f"ConfigMap found: {current_configmap}. Reusing it")
-                self._create_resources(["profiles"])
+                self.logger.info(f"ConfigMap found: {current_configmap}. Replacing it")
+                self.lightkube_client.delete(
+                    ConfigMap, name=self._context["configmap_name"]
+                )
+            self._create_resources(["config_maps"])
         except ApiError:
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
         self.handle_ingress(interfaces)
         kf_profiles = list(kf_profiles.get_data().values())[0]
-        profiles_service = kf_profiles["service-name"]
-        self._update_layer(profiles_service)
+        self.profiles_service = kf_profiles["service-name"]
+        try:
+            self._update_layer()
+        except CheckFailed as e:
+            self.model.unit.status = e.status
+            return
         self.model.unit.status = ActiveStatus()
 
 
