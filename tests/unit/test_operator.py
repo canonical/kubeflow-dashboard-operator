@@ -8,7 +8,9 @@ import yaml
 
 from jinja2 import Environment, FileSystemLoader
 from lightkube import codecs
+from lightkube.generic_resource import create_global_resource
 from lightkube.core.exceptions import ApiError
+from lightkube.types import PatchType
 from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
 from ops.testing import Harness
 from pathlib import Path
@@ -148,12 +150,16 @@ class TestCharm:
             "auth_manifests.yaml.j2",
             "configmaps.yaml.j2",
         ]
+        create_global_resource(
+            group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
+        )
+        # I am doing this so I can create list of mocked resources to compare later.
         env = Environment(loader=FileSystemLoader("src/templates"))
         expected_objects = []
         for file in resource_files:
             manifest = env.get_template(file).render(context)
             for obj in codecs.load_all_yaml(manifest):
-                expected_objects.append(mock.call.create(obj))
+                expected_objects.append(mock.call.apply(obj))
 
         mocked_lightkube_client = Mock()
         harness_with_relation.begin()
@@ -163,11 +169,62 @@ class TestCharm:
         mocked_lightkube_client.assert_has_calls(expected_objects)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_create_resources_patch(self, harness_with_relation: Harness):
+        context = {
+            "app_name": "kubeflow-dashboard",
+            "namespace": "kubeflow",
+            "configmap_name": "test-configmap",
+            "profilename": "test-profile",
+            "links": "",
+            "settings": "",
+        }
+        resource_files = [
+            "profile_crds.yaml.j2",
+            "auth_manifests.yaml.j2",
+            "configmaps.yaml.j2",
+        ]
+        create_global_resource(
+            group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
+        )
+        # I am doing this so I can create list of mocked resources to compare later.
+        env = Environment(loader=FileSystemLoader("src/templates"))
+        expected_objects = []
+        for file in resource_files:
+            manifest = env.get_template(file).render(context)
+            for obj in codecs.load_all_yaml(manifest):
+                expected_objects.append(mock.call.apply(obj))
+                expected_objects.append(
+                    mock.call.patch(
+                        type(obj), obj.metadata.name, obj, patch_type=PatchType.MERGE
+                    )
+                )
+        mocked_lightkube_client = Mock()
+        harness_with_relation.begin()
+        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        mocked_lightkube_client.apply.side_effect = _FakeApiError(code=409)
+        harness_with_relation.charm._context = context
+        harness_with_relation.charm._create_resources()
+        mocked_lightkube_client.assert_has_calls(expected_objects)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_create_resources_failure(self, harness_with_relation: Harness):
+        mocked_lightkube_client = Mock()
+        harness_with_relation.begin()
+        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        mocked_lightkube_client.apply.side_effect = _FakeApiError(code=409)
+        mocked_lightkube_client.patch.side_effect = _FakeApiError(code=404)
+        with pytest.raises(ApiError):
+            harness_with_relation.charm._create_resources()
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator._create_resources")
     @patch("charm.KubeflowDashboardOperator._update_layer")
     def test_main(self, update_layer, create_resources, harness_with_relation: Harness):
+        mocked_lightkube_client = Mock()
         expected_links = BASE_SIDEBAR
-        harness_with_relation.begin_with_initial_hooks()
+        harness_with_relation.begin()
+        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        harness_with_relation.charm.on.install.emit()
         create_resources.assert_called()
         update_layer.assert_called()
         assert isinstance(harness_with_relation.charm.model.unit.status, ActiveStatus)
