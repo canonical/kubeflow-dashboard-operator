@@ -62,23 +62,27 @@ jobs:
             provider: microk8s
             channel: 1.22/stable
             charmcraft-channel: latest/candidate
-      # https://github.com/charmed-kubernetes/actions-operator/issues/27
-      - run: sudo snap refresh charmcraft --channel latest/candidate
 
       # TODO: Remove once the actions-operator does this automatically
       - name: Configure kubectl
         run: |
           sg microk8s -c "microk8s config > ~/.kube/config"
-
-      - name: Run test
+      
+      - name: Configure microk8s
         run: |
           sg microk8s -c "microk8s enable rbac ingress metallb:10.64.140.43-10.64.140.49"
           # Requires the model to be called kubeflow due to this bug:
           # https://github.com/kubeflow/kubeflow/issues/6136
           juju add-model kubeflow
+
+      - name: Install Chrome driver
+        run: |
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt install ./google-chrome-stable_current_amd64.deb
           sudo apt-get install chromium-chromedriver
+
+      - name: Run test
+        run: |
           sg microk8s -c "tox -e integration -- --model kubeflow"
 
       - name: Get all
