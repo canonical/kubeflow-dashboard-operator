@@ -1,5 +1,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 from unittest.mock import patch, Mock
 from unittest import mock
 
@@ -21,6 +22,26 @@ from charm import KubeflowDashboardOperator
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
+RELATION_DATA = {
+    "app": "tensorboards-web-app",
+    "type": "item",
+    "link": "/tensorboards/",
+    "text": "Tensorboards",
+    "icon": "assessment",
+}
+DEFAULT_CONTEXT = {
+    "app_name": "kubeflow-dashboard",
+    "namespace": "kubeflow",
+    "configmap_name": "centraldashboard-config",
+    "profilename": "test-profile",
+    "links": BASE_SIDEBAR,
+    "settings": "",
+}
+RESOURCE_FILES = [
+    "profile_crds.yaml.j2",
+    "auth_manifests.yaml.j2",
+    "configmaps.yaml.j2",
+]
 
 
 class _FakeResponse:
@@ -50,7 +71,7 @@ def harness() -> Harness:
 
 
 @pytest.fixture(scope="function")
-def harness_with_relation(harness: Harness) -> Harness:
+def harness_with_profiles(harness: Harness) -> Harness:
     harness.set_leader(True)
     rel_id = harness.add_relation("kubeflow-profiles", "app")
 
@@ -118,38 +139,26 @@ class TestCharm:
 
     @patch("charm.KubeflowDashboardOperator._create_resources")
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_check_kf_profiles_success(self, harness_with_relation: Harness):
-        harness_with_relation.begin_with_initial_hooks()
+    def test_check_kf_profiles_success(self, harness_with_profiles: Harness):
+        harness_with_profiles.begin_with_initial_hooks()
 
-        assert harness_with_relation.charm.model.unit.status != WaitingStatus(
+        assert harness_with_profiles.charm.model.unit.status != WaitingStatus(
             "Waiting for kubeflow-profiles relation data"
         )
 
     @patch("charm.KubeflowDashboardOperator._update_layer")
     def test_on_kubeflow_dashboard_pebble_ready(
-        self, update, harness_with_relation: Harness
+        self, update, harness_with_profiles: Harness
     ):
-        harness_with_relation.container_pebble_ready(CHARM_NAME)
+        harness_with_profiles.container_pebble_ready(CHARM_NAME)
         assert (
-            harness_with_relation.get_container_pebble_plan(CHARM_NAME)._services
+            harness_with_profiles.get_container_pebble_plan(CHARM_NAME)._services
             is not None
         )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_create_resources_success(self, harness_with_relation: Harness):
-        context = {
-            "app_name": "kubeflow-dashboard",
-            "namespace": "kubeflow",
-            "configmap_name": "test-configmap",
-            "profilename": "test-profile",
-            "links": "",
-            "settings": "",
-        }
-        resource_files = [
-            "profile_crds.yaml.j2",
-            "auth_manifests.yaml.j2",
-            "configmaps.yaml.j2",
-        ]
+    def test_create_resources_success(self, harness_with_profiles: Harness):
+        resource_files = RESOURCE_FILES
         create_global_resource(
             group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
         )
@@ -157,32 +166,20 @@ class TestCharm:
         env = Environment(loader=FileSystemLoader("src/templates"))
         expected_objects = []
         for file in resource_files:
-            manifest = env.get_template(file).render(context)
+            manifest = env.get_template(file).render(DEFAULT_CONTEXT)
             for obj in codecs.load_all_yaml(manifest):
                 expected_objects.append(mock.call.apply(obj))
 
         mocked_lightkube_client = Mock()
-        harness_with_relation.begin()
-        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
-        harness_with_relation.charm._context = context
-        harness_with_relation.charm._create_resources()
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.lightkube_client = mocked_lightkube_client
+        harness_with_profiles.charm._context = DEFAULT_CONTEXT
+        harness_with_profiles.charm._create_resources()
         mocked_lightkube_client.assert_has_calls(expected_objects)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_create_resources_patch(self, harness_with_relation: Harness):
-        context = {
-            "app_name": "kubeflow-dashboard",
-            "namespace": "kubeflow",
-            "configmap_name": "test-configmap",
-            "profilename": "test-profile",
-            "links": "",
-            "settings": "",
-        }
-        resource_files = [
-            "profile_crds.yaml.j2",
-            "auth_manifests.yaml.j2",
-            "configmaps.yaml.j2",
-        ]
+    def test_create_resources_patch(self, harness_with_profiles: Harness):
+        resource_files = RESOURCE_FILES
         create_global_resource(
             group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
         )
@@ -190,7 +187,7 @@ class TestCharm:
         env = Environment(loader=FileSystemLoader("src/templates"))
         expected_objects = []
         for file in resource_files:
-            manifest = env.get_template(file).render(context)
+            manifest = env.get_template(file).render(DEFAULT_CONTEXT)
             for obj in codecs.load_all_yaml(manifest):
                 expected_objects.append(mock.call.apply(obj))
                 expected_objects.append(
@@ -199,56 +196,88 @@ class TestCharm:
                     )
                 )
         mocked_lightkube_client = Mock()
-        harness_with_relation.begin()
-        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.lightkube_client = mocked_lightkube_client
         mocked_lightkube_client.apply.side_effect = _FakeApiError(code=409)
-        harness_with_relation.charm._context = context
-        harness_with_relation.charm._create_resources()
+        harness_with_profiles.charm._context = DEFAULT_CONTEXT
+        harness_with_profiles.charm._create_resources()
         mocked_lightkube_client.assert_has_calls(expected_objects)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_create_resources_failure(self, harness_with_relation: Harness):
+    def test_create_resources_failure(self, harness_with_profiles: Harness):
         mocked_lightkube_client = Mock()
-        harness_with_relation.begin()
-        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.lightkube_client = mocked_lightkube_client
         mocked_lightkube_client.apply.side_effect = _FakeApiError(code=409)
         mocked_lightkube_client.patch.side_effect = _FakeApiError(code=404)
         with pytest.raises(ApiError):
-            harness_with_relation.charm._create_resources()
+            harness_with_profiles.charm._create_resources()
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator._create_resources")
     @patch("charm.KubeflowDashboardOperator._update_layer")
-    def test_main(self, update_layer, create_resources, harness_with_relation: Harness):
+    def test_main(self, update_layer, create_resources, harness_with_profiles: Harness):
         mocked_lightkube_client = Mock()
         expected_links = BASE_SIDEBAR
-        harness_with_relation.begin()
-        harness_with_relation.charm.lightkube_client = mocked_lightkube_client
-        harness_with_relation.charm.on.install.emit()
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.lightkube_client = mocked_lightkube_client
+        harness_with_profiles.charm.on.install.emit()
         create_resources.assert_called()
         update_layer.assert_called()
-        assert isinstance(harness_with_relation.charm.model.unit.status, ActiveStatus)
-        assert harness_with_relation.charm._context["links"] == expected_links
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+        assert harness_with_profiles.charm._context["links"] == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator._create_resources")
-    def test_on_sidebar_relation_added(
-        self, create_resources, harness_with_relation: Harness
+    @patch("charm.KubeflowDashboardOperator.lightkube_client")
+    def test_on_sidebar_relation_changed(
+        self, lightkube_client, harness_with_profiles: Harness
     ):
-        rel_id = harness_with_relation.add_relation("sidebar", "tensorboards-web-app")
-        harness_with_relation.add_relation_unit(rel_id, "tensorboards-web-app/0")
-        harness_with_relation.begin_with_initial_hooks()
-        create_resources.assert_called()
-        assert isinstance(harness_with_relation.charm.model.unit.status, ActiveStatus)
+        # Expected tensorboard link data
+
+        expected_links = json.loads(BASE_SIDEBAR)
+        expected_links["menuLinks"].append(RELATION_DATA)
+        context = DEFAULT_CONTEXT
+        context = {
+            **DEFAULT_CONTEXT,
+            **{"links": json.dumps(expected_links)},
+        }
+        cm_file = "configmaps.yaml.j2"
+        env = Environment(loader=FileSystemLoader("src/templates"))
+        manifest = env.get_template(cm_file).render(context)
+        expected_objects = []
+        for obj in codecs.load_all_yaml(manifest):
+            expected_objects.append(mock.call.apply(obj))
+        relation_id = harness_with_profiles.add_relation(
+            "sidebar", "tensorboards-web-app"
+        )
+        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
+        harness_with_profiles.update_relation_data(
+            relation_id,
+            "tensorboards-web-app",
+            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
+        )
+        harness_with_profiles.begin_with_initial_hooks()
+        lightkube_client.assert_has_calls(expected_objects)
+        assert harness_with_profiles.charm._context["links"] == json.dumps(
+            expected_links
+        )
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator._create_resources")
+    @patch("charm.KubeflowDashboardOperator.lightkube_client")
     def test_on_sidebar_relation_removed(
-        self, create_resources, harness_with_relation: Harness
+        self, lightkube_client, harness_with_profiles: Harness
     ):
-        rel_id = harness_with_relation.add_relation("sidebar", "tensorboards-web-app")
-        harness_with_relation.add_relation_unit(rel_id, "tensorboards-web-app/0")
-        harness_with_relation.remove_relation(rel_id)
-        harness_with_relation.begin_with_initial_hooks()
-        create_resources.assert_called()
-        assert isinstance(harness_with_relation.charm.model.unit.status, ActiveStatus)
+        relation_id = harness_with_profiles.add_relation(
+            "sidebar", "tensorboards-web-app"
+        )
+        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
+        harness_with_profiles.update_relation_data(
+            relation_id,
+            "tensorboards-web-app",
+            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
+        )
+        harness_with_profiles.remove_relation(relation_id)
+        harness_with_profiles.begin_with_initial_hooks()
+        assert harness_with_profiles.charm._context["links"] == BASE_SIDEBAR
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
