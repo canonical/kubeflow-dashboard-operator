@@ -82,26 +82,35 @@ def harness_with_profiles(harness: Harness) -> Harness:
         "app",
         {"_supported_versions": "- v1", "data": yaml.dump(data)},
     )
-    return harness
+    yield harness
+    harness.cleanup()
 
 
 class TestCharm:
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_failure(self, harness: Harness):
         harness.begin_with_initial_hooks()
-        assert isinstance(harness.charm.model.unit.status, WaitingStatus)
+        assert harness.charm.model.unit.status == WaitingStatus(
+            "Waiting for leadership"
+        )
         assert (
             "status_set",
             "waiting",
             "Waiting for leadership",
             {"is_app": False},
         ) in harness._get_backend_calls()
+        harness.set_leader(True)
+        assert harness.charm.model.unit.status != WaitingStatus(
+            "Waiting for leadership"
+        )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_success(self, harness: Harness):
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
-        assert isinstance(harness.charm.model.unit.status, WaitingStatus)
+        assert harness.charm.model.unit.status != WaitingStatus(
+            "Waiting for leadership"
+        )
         assert (
             "status_set",
             "waiting",
