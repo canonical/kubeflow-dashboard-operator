@@ -108,7 +108,7 @@ class KubeflowDashboardOperator(CharmBase):
     @profiles_service.setter
     def profiles_service(self, service):
         self._profiles_service = service
- 
+
     @property
     def container(self):
         return self._container

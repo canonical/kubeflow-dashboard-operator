@@ -197,7 +197,7 @@ async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     tensorboard_charm_name = "tensorboards-web-app"
     charm_name = METADATA["name"]
     await ops_test.model.deploy(
-        "tensorboard", channel="latest/edge", trust=True
+        "tensorboards-web-app", channel="latest/edge", trust=True
     )  # This assumes that the chages were merged
     await ops_test.model.add_relation(
         f"{tensorboard_charm_name}:sidebar", f"{charm_name}:sidebar"

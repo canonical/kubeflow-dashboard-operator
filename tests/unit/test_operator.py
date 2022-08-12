@@ -182,12 +182,20 @@ class TestCharm:
     @patch("charm.KubeflowDashboardOperator.lightkube_client")
     @patch("charm.KubeflowDashboardOperator.container")
     def test_update_layer_failure(
-        self, container, lightkube_client, create_resources, harness_with_profiles: Harness
+        self,
+        container,
+        lightkube_client,
+        create_resources,
+        harness_with_profiles: Harness,
     ):
-        container.replan.side_effect = _FakeChangeError("Fake problem during layer update", None)
+        container.replan.side_effect = _FakeChangeError(
+            "Fake problem during layer update", None
+        )
         harness_with_profiles.container_pebble_ready(CHARM_NAME)
         harness_with_profiles.begin_with_initial_hooks()
-        assert harness_with_profiles.charm.model.unit.status == BlockedStatus("Failed to replan")
+        assert harness_with_profiles.charm.model.unit.status == BlockedStatus(
+            "Failed to replan"
+        )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_create_resources_success(self, harness_with_profiles: Harness):
