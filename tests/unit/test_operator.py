@@ -13,6 +13,7 @@ from lightkube.generic_resource import create_global_resource
 from lightkube.core.exceptions import ApiError
 from lightkube.types import PatchType
 from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
+from ops.pebble import ChangeError
 from ops.testing import Harness
 from pathlib import Path
 
@@ -59,6 +60,13 @@ class _FakeApiError(ApiError):
 
     def __init__(self, code=400):
         super().__init__(response=_FakeResponse(code))
+
+
+class _FakeChangeError(ChangeError):
+    """Used to simulate a ChangeError during testing."""
+
+    def __init__(self, err, change):
+        super().__init__(err, change)
 
 
 @pytest.fixture(scope="function")
@@ -155,15 +163,31 @@ class TestCharm:
             "Waiting for kubeflow-profiles relation data"
         )
 
-    @patch("charm.KubeflowDashboardOperator._update_layer")
-    def test_on_kubeflow_dashboard_pebble_ready(
-        self, update, harness_with_profiles: Harness
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator._create_resources")
+    @patch("charm.KubeflowDashboardOperator.lightkube_client")
+    def test_update_layer_success(
+        self, lightkube_client, create_resources, harness_with_profiles: Harness
     ):
         harness_with_profiles.container_pebble_ready(CHARM_NAME)
+        harness_with_profiles.begin_with_initial_hooks()
         assert (
             harness_with_profiles.get_container_pebble_plan(CHARM_NAME)._services
             is not None
         )
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator._create_resources")
+    @patch("charm.KubeflowDashboardOperator.lightkube_client")
+    @patch("charm.KubeflowDashboardOperator.container")
+    def test_update_layer_failure(
+        self, container, lightkube_client, create_resources, harness_with_profiles: Harness
+    ):
+        container.replan.side_effect = _FakeChangeError("Fake problem during layer update", None)
+        harness_with_profiles.container_pebble_ready(CHARM_NAME)
+        harness_with_profiles.begin_with_initial_hooks()
+        assert harness_with_profiles.charm.model.unit.status == BlockedStatus("Failed to replan")
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_create_resources_success(self, harness_with_profiles: Harness):

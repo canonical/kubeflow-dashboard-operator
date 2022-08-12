@@ -108,6 +108,10 @@ class KubeflowDashboardOperator(CharmBase):
     @profiles_service.setter
     def profiles_service(self, service):
         self._profiles_service = service
+ 
+    @property
+    def container(self):
+        return self._container
 
     @property
     def _kubeflow_dashboard_operator_layer(self) -> Layer:
@@ -135,7 +139,7 @@ class KubeflowDashboardOperator(CharmBase):
         return Layer(layer_config)
 
     def _check_container_connection(self):
-        if not self._container.can_connect():
+        if not self.container.can_connect():
             raise CheckFailed("Waiting for pod startup to complete", WaitingStatus)
 
     def _check_model_name(self):
@@ -153,17 +157,17 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
-        current_layer = self._container.get_plan()
+        current_layer = self.container.get_plan()
         new_layer = self._kubeflow_dashboard_operator_layer
         self.logger.debug(f"NEW LAYER: {new_layer}")
         if current_layer.services != new_layer.services:
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
-            self._container.add_layer(self._container_name, new_layer, combine=True)
+            self.container.add_layer(self._container_name, new_layer, combine=True)
             try:
                 self.logger.info(
                     "Pebble plan updated with new configuration, replaning"
                 )
-                self._container.replan()
+                self.container.replan()
             except ChangeError:
                 raise CheckFailed("Failed to replan", BlockedStatus)
 
