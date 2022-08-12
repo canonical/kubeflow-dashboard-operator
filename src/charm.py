@@ -5,13 +5,12 @@
 import json
 import logging
 import traceback
-from typing import List, Optional
 
 from pathlib import Path
 
+from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
-from jinja2 import Environment, FileSystemLoader
-from lightkube import Client, ApiError, codecs
+from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.types import PatchType
 from lightkube.resources.core_v1 import ConfigMap
@@ -49,16 +48,14 @@ class KubeflowDashboardOperator(CharmBase):
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
-        self._lightkube_client: Optional[Client] = None
-        self.env = Environment(loader=FileSystemLoader("src/templates"))
         self._name = self.model.app.name
         self._service = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._resource_files = {
-            "profiles": "profile_crds.yaml.j2",
-            "auths": "auth_manifests.yaml.j2",
-            "config_maps": "configmaps.yaml.j2",
+            "profiles": "src/templates/profile_crds.yaml.j2",
+            "auths": "src/templates/auth_manifests.yaml.j2",
+            "config_maps": "src/templates/configmaps.yaml.j2",
         }
         self._context = {
             "app_name": self._name,
@@ -68,6 +65,7 @@ class KubeflowDashboardOperator(CharmBase):
             "links": BASE_SIDEBAR,
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
+        self._k8s_resource_handler = None
         self.service_patcher = KubernetesServicePatch(
             self, [(self._container_name, self.model.config["port"])]
         )
@@ -89,19 +87,6 @@ class KubeflowDashboardOperator(CharmBase):
         )
 
     @property
-    def lightkube_client(self):
-        if not self._lightkube_client:
-            self._lightkube_client = Client(
-                namespace=self._namespace, field_manager=self._lightkube_field_manager
-            )
-            load_in_cluster_generic_resources(self._lightkube_client)
-        return self._lightkube_client
-
-    @lightkube_client.setter
-    def lightkube_client(self, client):
-        self._lightkube_client = client
-
-    @property
     def profiles_service(self):
         return self._profiles_service
 
@@ -112,6 +97,22 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def container(self):
         return self._container
+
+    @property
+    def k8s_resource_handler(self):
+        if not self._k8s_resource_handler:
+            self._k8s_resource_handler = KubernetesResourceHandler(
+                field_manager=self._lightkube_field_manager,
+                template_files=self._resource_files.values(),
+                context=self._context,
+                logger=self.logger,
+            )
+        load_in_cluster_generic_resources(self._k8s_resource_handler.lightkube_client)
+        return self._k8s_resource_handler
+
+    @k8s_resource_handler.setter
+    def k8s_resource_handler(self, handler: KubernetesResourceHandler):
+        self._k8s_resource_handler = handler
 
     @property
     def _kubeflow_dashboard_operator_layer(self) -> Layer:
@@ -201,41 +202,6 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
-    def _create_resources(self, resource_type: List[str] = None) -> None:
-        """Creates the resources for the charm."""
-        if resource_type is None:
-            resource_type = self._resource_files.keys()
-        for resource_type in resource_type:
-            resource_file = self._resource_files[resource_type]
-            manifest = self.env.get_template(resource_file).render(self._context)
-            for obj in codecs.load_all_yaml(manifest):
-                try:
-                    self.lightkube_client.apply(obj)
-                except ApiError as e:
-                    if e.status.code == 409:
-                        self.logger.info("replacing resource: %s.", str(obj.to_dict()))
-                        self.logger.debug(f"manifest is {manifest}")
-                        try:
-                            self.lightkube_client.patch(
-                                type(obj),
-                                obj.metadata.name,
-                                obj,
-                                patch_type=PatchType.MERGE,
-                            )
-                        except ApiError as e:
-                            if e.status.code == 409:
-                                self.logger.info(
-                                    "Unable to replace resource: %s. Skipping.",
-                                    str(obj.to_dict()),
-                                )
-                            else:
-                                raise e
-                    else:
-                        self.logger.debug(
-                            "failed to create resource: %s.", str(obj.to_dict())
-                        )
-                        raise e
-
     def main(self, event) -> None:
         """Main entry point for the Charm."""
         try:
@@ -249,20 +215,7 @@ class KubeflowDashboardOperator(CharmBase):
             return
         try:
             self.unit.status = MaintenanceStatus("Creating k8s resources")
-            try:
-                self._create_resources(["auths", "profiles"])
-                current_configmap = self.lightkube_client.get(
-                    ConfigMap, name=self._context["configmap_name"]
-                )
-            except ApiError as e:
-                if e.status.code == 404:
-                    self.logger.info(f"ConfigMap not found: {e}. Creating one")
-            else:
-                self.logger.info(f"ConfigMap found: {current_configmap}. Replacing it")
-                self.lightkube_client.delete(
-                    ConfigMap, name=self._context["configmap_name"]
-                )
-            self._create_resources(["config_maps"])
+            self.k8s_resource_handler.apply()
         except ApiError:
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
@@ -285,7 +238,7 @@ class KubeflowDashboardOperator(CharmBase):
             return
         try:
             self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
-            current_configmap = self.lightkube_client.get(
+            current_configmap = self.k8s_resource_handler.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
             old_sidebar_config = json.loads(current_configmap.data["links"])
@@ -299,13 +252,15 @@ class KubeflowDashboardOperator(CharmBase):
             old_sidebar_config["menuLinks"].append(new_config_link)
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
-                self._create_resources(resource_type=["config_maps"])
+                self.k8s_resource_handler.context = self._context
+                self.k8s_resource_handler.template_files = [self._resource_files["config_maps"]]
+                self.k8s_resource_handler.apply()
             except ApiError:
                 self.logger.error(traceback.format_exc())
                 self.unit.status = BlockedStatus("kubernetes resource creation failed")
-            self.model.unit.status = ActiveStatus()
         else:
             self.logger.info(f"{new_config_link} already exists in configmap")
+        self.model.unit.status = ActiveStatus()
 
     def _on_sidebar_relation_broken(self, event: RelationBrokenEvent) -> None:
         if not self.unit.is_leader():
@@ -313,7 +268,7 @@ class KubeflowDashboardOperator(CharmBase):
         self.logger.info(f"{event.app.name} relation broken")
         try:
             self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
-            current_configmap = self.lightkube_client.get(
+            current_configmap = self.k8s_resource_handler.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
             old_sidebar_config = json.loads(current_configmap.data["links"])
@@ -332,11 +287,13 @@ class KubeflowDashboardOperator(CharmBase):
             old_sidebar_config["menuLinks"] = new_menu_links
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
-                self._create_resources(resource_type=["config_maps"])
+                self.k8s_resource_handler.context = self._context
+                self.k8s_resource_handler.template_files = [self._resource_files["config_maps"]]
+                self.k8s_resource_handler.apply()
             except ApiError:
                 self.logger.error(traceback.format_exc())
                 self.unit.status = BlockedStatus("kubernetes resource creation failed")
-            self.model.unit.status = ActiveStatus()
+        self.model.unit.status = ActiveStatus()
 
 
 if __name__ == "__main__":
