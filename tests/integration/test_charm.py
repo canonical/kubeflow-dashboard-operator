@@ -9,7 +9,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from lightkube import Client
+from lightkube import Client, ApiError
 from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -71,6 +71,7 @@ def fix_queryselector(elems):
     return 'return document.querySelector("' + selectors + '")'
 
 
+@pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
@@ -94,6 +95,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
     charm_name = METADATA["name"]
@@ -108,16 +110,19 @@ async def test_add_profile_relation(ops_test: OpsTest):
     )
 
 
+@pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     charm_name = METADATA["name"]
     assert ops_test.model.applications[charm_name].units[0].workload_status == "active"
 
 
+@pytest.mark.asyncio
 async def test_configmap_exist():
     configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
     assert configmap is not None
 
 
+@pytest.mark.asyncio
 def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
 
@@ -176,8 +181,21 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
         wait.until(lambda x: x.execute_script(script))
 
 
+@pytest.mark.asyncio
 async def test_configmap_contents(ops_test: OpsTest):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
+
+
+@pytest.mark.asyncio
+async def test_charm_removal(ops_test: OpsTest):
+    charm_name = METADATA["name"]
+    await ops_test.model.remove_application(charm_name, block_until_done=True)
+
+    # Ensure that the configmap is gone
+    try:
+        _ = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
+    except ApiError as e:
+        assert e.status.code == 404
