@@ -9,6 +9,7 @@ import traceback
 from pathlib import Path
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
+from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -24,6 +25,11 @@ from serialized_data_interface import (
 )
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
+DEFAULT_RESOURCE_FILES = {
+    "profiles": "src/templates/profile_crds.yaml.j2",
+    "auths": "src/templates/auth_manifests.yaml.j2",
+    "config_maps": "src/templates/configmaps.yaml.j2",
+}
 
 
 class CheckFailed(Exception):
@@ -51,11 +57,7 @@ class KubeflowDashboardOperator(CharmBase):
         self._service = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
-        self._resource_files = {
-            "profiles": "src/templates/profile_crds.yaml.j2",
-            "auths": "src/templates/auth_manifests.yaml.j2",
-            "config_maps": "src/templates/configmaps.yaml.j2",
-        }
+        self._resource_files = DEFAULT_RESOURCE_FILES
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
@@ -78,12 +80,15 @@ class KubeflowDashboardOperator(CharmBase):
             self.on.kubeflow_dashboard_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
+
         self.framework.observe(
             self.on.sidebar_relation_changed, self._on_sidebar_relation_changed
         )
         self.framework.observe(
             self.on.sidebar_relation_broken, self._on_sidebar_relation_broken
         )
+
+        self.framework.observe(self.on.remove, self._on_remove)
 
     @property
     def profiles_service(self):
@@ -296,6 +301,17 @@ class KubeflowDashboardOperator(CharmBase):
             except ApiError:
                 self.logger.error(traceback.format_exc())
                 self.unit.status = BlockedStatus("kubernetes resource creation failed")
+        self.model.unit.status = ActiveStatus()
+
+    def _on_remove(self, event):
+        self.unit.status = MaintenanceStatus("Removing k8s resources")
+        self.k8s_resource_handler._template_files = DEFAULT_RESOURCE_FILES.values()
+        manifests = self.k8s_resource_handler.render_manifests()
+        self.logger.info(f"MANIFESTS are {manifests}")
+        try:
+            delete_many(self.k8s_resource_handler.lightkube_client, manifests)
+        except ApiError as e:
+            self.logger.warning(f"Failed to delete resources: {e}")
         self.model.unit.status = ActiveStatus()
 
 

@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 from unittest.mock import patch, MagicMock
+from unittest import mock
 
 import pytest
 import json
@@ -32,7 +33,7 @@ DEFAULT_CONTEXT = {
     "links": BASE_SIDEBAR,
     "settings": "",
 }
-RESOURCE_FILES = [
+DEFAULT_RESOURCE_FILES = [
     "profile_crds.yaml.j2",
     "auth_manifests.yaml.j2",
     "configmaps.yaml.j2",
@@ -189,7 +190,10 @@ class TestCharm:
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
     @patch("charm.KubeflowDashboardOperator._update_layer")
     def test_main(
-        self, update_layer, k8s_resource_handler, harness_with_profiles: Harness
+        self,
+        update_layer: MagicMock,
+        k8s_resource_handler: MagicMock,
+        harness_with_profiles: Harness,
     ):
         expected_links = BASE_SIDEBAR
         harness_with_profiles.begin()
@@ -242,4 +246,19 @@ class TestCharm:
         harness_with_profiles.begin_with_initial_hooks()
         k8s_resource_handler.apply.assert_called()
         assert harness_with_profiles.charm._context["links"] == BASE_SIDEBAR
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.delete_many")
+    def test_on_remove_success(
+        self,
+        delete_many: MagicMock,
+        k8s_resource_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.on.remove.emit()
+        k8s_resource_handler.assert_has_calls([mock.call.render_manifests()])
+        delete_many.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
