@@ -22,6 +22,10 @@ from pytest_operator.plugin import OpsTest
 
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CHARM_NAME = METADATA["name"]
+CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
+CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
+PROFILES_CHARM_NAME = "kubeflow-profiles"
 
 
 @pytest_asyncio.fixture
@@ -34,8 +38,8 @@ async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, st
         "--format=yaml",
     )
     status = yaml.safe_load(tmp[1])
-    address = status["applications"]["kubeflow-dashboard"]["address"]
-    config = await ops_test.model.applications["kubeflow-dashboard"].get_config()
+    address = status["applications"][CHARM_NAME]["address"]
+    config = await ops_test.model.applications[CHARM_NAME].get_config()
     port = config["port"]["value"]
     url = f"http://{address}.nip.io:{port}/"
     options = Options()
@@ -81,16 +85,15 @@ async def test_build_and_deploy(ops_test: OpsTest):
         my_charm, resources={"oci-image": image_path}, trust=True
     )
 
-    charm_name = METADATA["name"]
     await ops_test.model.wait_for_idle(
-        [charm_name],
+        [CHARM_NAME],
         raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
-    assert ops_test.model.applications[charm_name].units[0].workload_status == "waiting"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "waiting"
     assert (
-        ops_test.model.applications[charm_name].units[0].workload_status_message
+        ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
         == "Waiting for kubeflow-profiles relation data"
     )
 
@@ -98,11 +101,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
-    charm_name = METADATA["name"]
-    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
-    await ops_test.model.add_relation("kubeflow-profiles", charm_name)
+    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
+    await ops_test.model.add_relation(PROFILES_CHARM_NAME, CHARM_NAME)
     await ops_test.model.wait_for_idle(
-        ["kubeflow-profiles", charm_name],
+        [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
         raise_on_blocked=True,
         raise_on_error=True,
@@ -112,13 +114,12 @@ async def test_add_profile_relation(ops_test: OpsTest):
 
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
-    charm_name = METADATA["name"]
-    assert ops_test.model.applications[charm_name].units[0].workload_status == "active"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
 @pytest.mark.asyncio
 async def test_configmap_exist():
-    configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
+    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     assert configmap is not None
 
 
@@ -184,18 +185,17 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 @pytest.mark.asyncio
 async def test_configmap_contents(ops_test: OpsTest):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
+    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
 
 @pytest.mark.asyncio
 async def test_charm_removal(ops_test: OpsTest):
-    charm_name = METADATA["name"]
-    await ops_test.model.remove_application(charm_name, block_until_done=True)
+    await ops_test.model.remove_application(CHARM_NAME, block_until_done=True)
 
     # Ensure that the configmap is gone
     try:
-        _ = Client().get(ConfigMap, "centraldashboard-config", namespace="kubeflow")
+        _ = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     except ApiError as e:
         assert e.status.code == 404
