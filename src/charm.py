@@ -12,7 +12,6 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
-from lightkube.types import PatchType
 from lightkube.resources.core_v1 import ConfigMap
 from ops.charm import CharmBase, RelationChangedEvent, RelationBrokenEvent
 from ops.main import main
@@ -253,7 +252,9 @@ class KubeflowDashboardOperator(CharmBase):
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
                 self.k8s_resource_handler.context = self._context
-                self.k8s_resource_handler.template_files = [self._resource_files["config_maps"]]
+                self.k8s_resource_handler.template_files = [
+                    self._resource_files["config_maps"]
+                ]
                 self.k8s_resource_handler.apply()
             except ApiError:
                 self.logger.error(traceback.format_exc())
@@ -288,7 +289,9 @@ class KubeflowDashboardOperator(CharmBase):
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
                 self.k8s_resource_handler.context = self._context
-                self.k8s_resource_handler.template_files = [self._resource_files["config_maps"]]
+                self.k8s_resource_handler.template_files = [
+                    self._resource_files["config_maps"]
+                ]
                 self.k8s_resource_handler.apply()
             except ApiError:
                 self.logger.error(traceback.format_exc())

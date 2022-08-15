@@ -196,9 +196,16 @@ async def test_configmap_contents(ops_test: OpsTest):
 async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     tensorboard_charm_name = "tensorboards-web-app"
     charm_name = METADATA["name"]
-    await ops_test.model.deploy(
-        "tensorboards-web-app", channel="latest/edge", trust=True
-    )  # This assumes that the chages were merged
+    # Change to concrete charm after publish ("tensorboard")
+    charm_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/tensorboards-web-app_ubuntu-20.04-amd64.charm"
+    metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
+    metadata = yaml.safe_load(Path(metadata_path).read_text())
+    image_path = metadata["resources"]["oci-image"]["upstream-source"]
+
+    await ops_test.model.deploy(charm_path, resources={"oci-image": image_path})
+    # await ops_test.model.deploy(
+    #     "tensorboards-web-app", channel="latest/edge", trust=True
+    # )  # This assumes that the chages were merged
     await ops_test.model.add_relation(
         f"{tensorboard_charm_name}:sidebar", f"{charm_name}:sidebar"
     )

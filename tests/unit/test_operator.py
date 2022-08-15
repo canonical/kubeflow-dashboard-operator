@@ -46,13 +46,6 @@ class _FakeChangeError(ChangeError):
         super().__init__(err, change)
 
 
-class _FakeChangeError(ChangeError):
-    """Used to simulate a ChangeError during testing."""
-
-    def __init__(self, err, change):
-        super().__init__(err, change)
-
-
 @pytest.fixture(scope="function")
 def harness() -> Harness:
     harness = Harness(KubeflowDashboardOperator)
@@ -209,23 +202,11 @@ class TestCharm:
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
     def test_on_sidebar_relation_changed(
-        self, k8s_resource_handler, harness_with_profiles: Harness
+        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
     ):
         # Expected tensorboard link data
-
         expected_links = json.loads(BASE_SIDEBAR)
         expected_links["menuLinks"].append(RELATION_DATA)
-        context = DEFAULT_CONTEXT
-        context = {
-            **DEFAULT_CONTEXT,
-            **{"links": json.dumps(expected_links)},
-        }
-        cm_file = "configmaps.yaml.j2"
-        env = Environment(loader=FileSystemLoader("src/templates"))
-        manifest = env.get_template(cm_file).render(context)
-        expected_objects = []
-        for obj in codecs.load_all_yaml(manifest):
-            expected_objects.append(mock.call.apply(obj))
         relation_id = harness_with_profiles.add_relation(
             "sidebar", "tensorboards-web-app"
         )
@@ -236,63 +217,29 @@ class TestCharm:
             {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
         )
         harness_with_profiles.begin_with_initial_hooks()
-        lightkube_client.assert_has_calls(expected_objects)
+        k8s_resource_handler.apply.assert_called()
         assert harness_with_profiles.charm._context["links"] == json.dumps(
             expected_links
         )
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
 
-    # @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    # @patch("charm.KubeflowDashboardOperator.lightkube_client")
-    # def test_on_sidebar_relation_changed(
-    #     self, lightkube_client, harness_with_profiles: Harness
-    # ):
-    #     # Expected tensorboard link data
-
-    #     expected_links = json.loads(BASE_SIDEBAR)
-    #     expected_links["menuLinks"].append(RELATION_DATA)
-    #     context = DEFAULT_CONTEXT
-    #     context = {
-    #         **DEFAULT_CONTEXT,
-    #         **{"links": json.dumps(expected_links)},
-    #     }
-    #     cm_file = "configmaps.yaml.j2"
-    #     env = Environment(loader=FileSystemLoader("src/templates"))
-    #     manifest = env.get_template(cm_file).render(context)
-    #     expected_objects = []
-    #     for obj in codecs.load_all_yaml(manifest):
-    #         expected_objects.append(mock.call.apply(obj))
-    #     relation_id = harness_with_profiles.add_relation(
-    #         "sidebar", "tensorboards-web-app"
-    #     )
-    #     harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
-    #     harness_with_profiles.update_relation_data(
-    #         relation_id,
-    #         "tensorboards-web-app",
-    #         {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
-    #     )
-    #     harness_with_profiles.begin_with_initial_hooks()
-    #     lightkube_client.assert_has_calls(expected_objects)
-    #     assert harness_with_profiles.charm._context["links"] == json.dumps(
-    #         expected_links
-    #     )
-    #     assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-
-    # @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    # @patch("charm.KubeflowDashboardOperator.lightkube_client")
-    # def test_on_sidebar_relation_removed(
-    #     self, lightkube_client, harness_with_profiles: Harness
-    # ):
-    #     relation_id = harness_with_profiles.add_relation(
-    #         "sidebar", "tensorboards-web-app"
-    #     )
-    #     harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
-    #     harness_with_profiles.update_relation_data(
-    #         relation_id,
-    #         "tensorboards-web-app",
-    #         {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
-    #     )
-    #     harness_with_profiles.remove_relation(relation_id)
-    #     harness_with_profiles.begin_with_initial_hooks()
-    #     assert harness_with_profiles.charm._context["links"] == BASE_SIDEBAR
-    #     assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    def test_on_sidebar_relation_removed(
+        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
+    ):
+        # Expected tensorboard link data
+        relation_id = harness_with_profiles.add_relation(
+            "sidebar", "tensorboards-web-app"
+        )
+        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
+        harness_with_profiles.update_relation_data(
+            relation_id,
+            "tensorboards-web-app",
+            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
+        )
+        harness_with_profiles.remove_relation(relation_id)
+        harness_with_profiles.begin_with_initial_hooks()
+        k8s_resource_handler.apply.assert_called()
+        assert harness_with_profiles.charm._context["links"] == BASE_SIDEBAR
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
