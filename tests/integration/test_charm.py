@@ -202,7 +202,7 @@ async def test_configmap_contents(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     await ops_test.model.deploy(
-        "TENSORBOARD_CHARM_NAME", channel="latest/edge", trust=True
+        TENSORBOARD_CHARM_NAME, channel="latest/edge", trust=True
     )  # This assumes that the chages were merged
     await ops_test.model.add_relation(
         f"{TENSORBOARD_CHARM_NAME}:sidebar", f"{CHARM_NAME}:sidebar"
