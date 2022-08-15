@@ -201,16 +201,9 @@ async def test_configmap_contents(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
-    # Change to concrete charm after publish ("tensorboard")
-    charm_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/tensorboards-web-app_ubuntu-20.04-amd64.charm"
-    metadata_path = "/home/pocik/Documents/code/kubeflow-tensorboards-operator/charms/tensorboards-web-app/metadata.yaml"
-    metadata = yaml.safe_load(Path(metadata_path).read_text())
-    image_path = metadata["resources"]["oci-image"]["upstream-source"]
-
-    await ops_test.model.deploy(charm_path, resources={"oci-image": image_path})
-    # await ops_test.model.deploy(
-    #     "TENSORBOARD_CHARM_NAME", channel="latest/edge", trust=True
-    # )  # This assumes that the chages were merged
+    await ops_test.model.deploy(
+        "TENSORBOARD_CHARM_NAME", channel="latest/edge", trust=True
+    )  # This assumes that the chages were merged
     await ops_test.model.add_relation(
         f"{TENSORBOARD_CHARM_NAME}:sidebar", f"{CHARM_NAME}:sidebar"
     )
