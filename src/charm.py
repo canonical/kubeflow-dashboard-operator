@@ -254,6 +254,9 @@ class KubeflowDashboardOperator(CharmBase):
         new_config_link = json.loads(new_config_string)
         if new_config_link not in old_sidebar_config["menuLinks"]:
             old_sidebar_config["menuLinks"].append(new_config_link)
+            old_sidebar_config["menuLinks"] = sorted(
+                old_sidebar_config["menuLinks"], key=lambda x: x["text"]
+            )
             self._context["links"] = json.dumps(old_sidebar_config)
             try:
                 self.k8s_resource_handler.context = self._context
