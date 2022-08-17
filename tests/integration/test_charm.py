@@ -31,6 +31,12 @@ TENSORBOARD_CHARM_NAME = "tensorboards-web-app"
 
 
 @pytest_asyncio.fixture
+async def lightkube_client():
+    lightkube_client = Client(field_manager="test")
+    yield lightkube_client
+
+
+@pytest_asyncio.fixture
 async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, str]:
     tmp = await ops_test.run(
         "juju",
@@ -104,7 +110,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
-    await ops_test.model.add_relation(PROFILES_CHARM_NAME, CHARM_NAME)
+    await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
@@ -120,29 +126,14 @@ async def test_status(ops_test: OpsTest):
 
 
 @pytest.mark.asyncio
-async def test_configmap_exist():
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+async def test_configmap_exist(lightkube_client: Client):
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     assert configmap is not None
 
 
 @pytest.mark.asyncio
 def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
-
-    # Ensure that sidebar links are set up properly
-    links = [
-        "/jupyter/",
-        "/pipeline/#/experiments",
-        "/pipeline/#/pipelines",
-        "/pipeline/#/runs",
-        "/pipeline/#/recurringruns",
-        "/volumes/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
-        wait.until(lambda x: x.execute_script(script))
 
     # Ensure that quick links are set up properly
     links = [
@@ -183,7 +174,7 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
 
 @pytest.mark.asyncio
-async def test_default_sidebar_links_missing_tensoboards(
+async def test_default_sidebar_links_missing_tensorboards(
     driver: Tuple[webdriver.Chrome, WebDriverWait, str]
 ):
     driver, wait, url = driver
@@ -192,19 +183,21 @@ async def test_default_sidebar_links_missing_tensoboards(
         wait.until(lambda x: x.execute_script(script))
 
 
-async def test_configmap_contents(ops_test: OpsTest):
+@pytest.mark.asyncio
+async def test_configmap_contents(lightkube_client: Client):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
 
+@pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     await ops_test.model.deploy(
         TENSORBOARD_CHARM_NAME, channel="latest/edge", trust=True
     )  # This assumes that the chages were merged
-    await ops_test.model.add_relation(
+    await ops_test.model.relate(
         f"{TENSORBOARD_CHARM_NAME}:sidebar", f"{CHARM_NAME}:sidebar"
     )
     await ops_test.model.wait_for_idle(
@@ -215,7 +208,8 @@ async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
     )
 
 
-def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
+@pytest.mark.asyncio
+def test_configmap_link_added_on_new_sidebar_relation(lightkube_client: Client):
     tensorboard_link = {
         "app": TENSORBOARD_CHARM_NAME,
         "type": "item",
@@ -225,7 +219,7 @@ def test_configmap_link_added_on_new_sidebar_relation(ops_test: OpsTest):
     }
     base_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     base_links["menuLinks"] = base_links["menuLinks"] + [tensorboard_link]
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME)
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME)
     links = json.loads(configmap.data["links"])
     assert links == base_links
 
@@ -238,12 +232,6 @@ async def test_tensorboard_added_sidebar_links(
 
     # Ensure that sidebar links are set up properly
     links = [
-        "/jupyter/",
-        "/pipeline/#/experiments",
-        "/pipeline/#/pipelines",
-        "/pipeline/#/runs",
-        "/pipeline/#/recurringruns",
-        "/volumes/",
         "/tensorboards/",
     ]
 
@@ -253,8 +241,11 @@ async def test_tensorboard_added_sidebar_links(
         wait.until(lambda x: x.execute_script(script))
 
 
+@pytest.mark.asyncio
 async def test_configmap_link_removed_on_removed_sidebar_relation(
-    ops_test: OpsTest, driver: Tuple[webdriver.Chrome, WebDriverWait, str]
+    ops_test: OpsTest,
+    driver: Tuple[webdriver.Chrome, WebDriverWait, str],
+    lightkube_client: Client,
 ):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     await ops_test.run(
@@ -270,7 +261,7 @@ async def test_configmap_link_removed_on_removed_sidebar_relation(
         raise_on_error=True,
         timeout=300,
     )
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME)
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME)
     links = json.loads(configmap.data["links"])
     assert links == expected_links
     driver, wait, url = driver
@@ -280,11 +271,11 @@ async def test_configmap_link_removed_on_removed_sidebar_relation(
 
 
 @pytest.mark.asyncio
-async def test_charm_removal(ops_test: OpsTest):
+async def test_charm_removal(ops_test: OpsTest, lightkube_client: Client):
     await ops_test.model.remove_application(CHARM_NAME, block_until_done=True)
 
     # Ensure that the configmap is gone
     try:
-        _ = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+        _ = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     except ApiError as e:
         assert e.status.code == 404
