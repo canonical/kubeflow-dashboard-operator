@@ -112,7 +112,7 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def _kubeflow_dashboard_operator_layer(self) -> Layer:
         layer_config = {
-            "summary": "dex-auth-operator layer",
+            "summary": "kubeflow-dashboard-operator layer",
             "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
                 self._container_name: {
@@ -205,6 +205,7 @@ class KubeflowDashboardOperator(CharmBase):
             self._check_leader()
             interfaces = self._get_interfaces()
             kf_profiles = self._check_kf_profiles(interfaces)
+            self.handle_ingress(interfaces)
         except CheckFailed as e:
             self.model.unit.status = e.status
             return
@@ -214,6 +215,7 @@ class KubeflowDashboardOperator(CharmBase):
         except ApiError:
             self.logger.error(traceback.format_exc())
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
+            return
         self.handle_ingress(interfaces)
         kf_profiles = list(kf_profiles.get_data().values())[0]
         self.profiles_service = kf_profiles["service-name"]

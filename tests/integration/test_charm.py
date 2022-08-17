@@ -29,6 +29,12 @@ PROFILES_CHARM_NAME = "kubeflow-profiles"
 
 
 @pytest_asyncio.fixture
+async def lightkube_client():
+    lightkube_client = Client(field_manager="test")
+    yield lightkube_client
+
+
+@pytest_asyncio.fixture
 async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, str]:
     tmp = await ops_test.run(
         "juju",
@@ -102,7 +108,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
-    await ops_test.model.add_relation(PROFILES_CHARM_NAME, CHARM_NAME)
+    await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
@@ -118,8 +124,8 @@ async def test_status(ops_test: OpsTest):
 
 
 @pytest.mark.asyncio
-async def test_configmap_exist():
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+async def test_configmap_exist(lightkube_client: Client):
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     assert configmap is not None
 
 
@@ -183,9 +189,10 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents(ops_test: OpsTest):
+async def test_configmap_contents(lightkube_client: Client):
+    client = lightkube_client
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    configmap = client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
