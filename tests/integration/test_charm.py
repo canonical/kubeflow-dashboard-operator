@@ -190,19 +190,18 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
 @pytest.mark.asyncio
 async def test_configmap_contents(lightkube_client: Client):
-    client = lightkube_client
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
 
 
 @pytest.mark.asyncio
-async def test_charm_removal(ops_test: OpsTest):
+async def test_charm_removal(ops_test: OpsTest, lightkube_client: Client):
     await ops_test.model.remove_application(CHARM_NAME, block_until_done=True)
 
     # Ensure that the configmap is gone
     try:
-        _ = Client().get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+        _ = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     except ApiError as e:
         assert e.status.code == 404
