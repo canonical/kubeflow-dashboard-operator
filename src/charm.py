@@ -7,6 +7,7 @@ import logging
 import traceback
 
 from pathlib import Path
+from typing import Dict
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -235,60 +236,60 @@ class KubeflowDashboardOperator(CharmBase):
             return
         self.model.unit.status = ActiveStatus()
 
-    def _on_sidebar_relation_changed(self, event: RelationChangedEvent) -> None:
-        if not self.unit.is_leader():
-            return
-        new_config_string = event.relation.data[event.app].get("config")
-        if new_config_string is None:
-            self.logger.info("No config link found in relation data")
-            return
+    def _get_sidebar_config(self) -> Dict:
         try:
-            self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
             current_configmap = self.k8s_resource_handler.lightkube_client.get(
                 ConfigMap, name=self._context["configmap_name"]
             )
             old_sidebar_config = json.loads(current_configmap.data["links"])
-        except Exception as e:
-            self.logger.info(
+        except ApiError as e:
+            self.logger.warning(
                 f"PROBLEM during configmap retrieval {e}. USING BASE CONFIG"
             )
             old_sidebar_config = json.loads(BASE_SIDEBAR)
-        new_config_link = json.loads(new_config_string)
-        if new_config_link not in old_sidebar_config["menuLinks"]:
-            old_sidebar_config["menuLinks"].append(new_config_link)
-            old_sidebar_config["menuLinks"] = sorted(
-                old_sidebar_config["menuLinks"], key=lambda x: x["text"]
+        return old_sidebar_config
+
+    def _update_sidebar_config(self, links_data: Dict) -> None:
+        self._context["links"] = json.dumps(links_data)
+        try:
+            self.k8s_resource_handler.context = self._context
+            self.k8s_resource_handler.template_files = [
+                self._resource_files["config_maps"]
+            ]
+            self.k8s_resource_handler.apply()
+        except ApiError as e:
+            self.unit.status = BlockedStatus(
+                f"kubernetes resource creation failed with {e}"
             )
-            self._context["links"] = json.dumps(old_sidebar_config)
-            try:
-                self.k8s_resource_handler.context = self._context
-                self.k8s_resource_handler.template_files = [
-                    self._resource_files["config_maps"]
-                ]
-                self.k8s_resource_handler.apply()
-            except ApiError:
-                self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus("kubernetes resource creation failed")
-        else:
-            self.logger.info(f"{new_config_link} already exists in configmap")
+
+    def _on_sidebar_relation_changed(self, event: RelationChangedEvent) -> None:
+        if not self.unit.is_leader():
+            return
+        new_links_string = event.relation.data[event.app].get("config")
+        if new_links_string is None:
+            self.logger.info("No links found in relation data, skipping")
+            return
+        self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
+        old_sidebar_config = self._get_sidebar_config()
+        new_links = json.loads(new_links_string)
+        new_valid_links = [
+            link for link in new_links if link not in old_sidebar_config["menuLinks"]
+        ]
+        old_sidebar_config["menuLinks"] = (
+            old_sidebar_config["menuLinks"] + new_valid_links
+        )
+        old_sidebar_config["menuLinks"] = sorted(
+            old_sidebar_config["menuLinks"], key=lambda x: x["text"]
+        )
+        self._update_sidebar_config(old_sidebar_config)
         self.model.unit.status = ActiveStatus()
 
     def _on_sidebar_relation_broken(self, event: RelationBrokenEvent) -> None:
         if not self.unit.is_leader():
             return
         self.logger.info(f"{event.app.name} relation broken")
-        try:
-            self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
-            current_configmap = self.k8s_resource_handler.lightkube_client.get(
-                ConfigMap, name=self._context["configmap_name"]
-            )
-            old_sidebar_config = json.loads(current_configmap.data["links"])
-        except Exception as e:
-            self.logger.info(
-                f"PROBLEM during configmap retrieval {e}. USING BASE CONFIG"
-            )
-            old_sidebar_config = json.loads(BASE_SIDEBAR)
-
+        self.unit.status = MaintenanceStatus("Adjusting sidebar configmap")
+        old_sidebar_config = self._get_sidebar_config()
         new_menu_links = [
             conf
             for conf in old_sidebar_config["menuLinks"]
@@ -296,16 +297,7 @@ class KubeflowDashboardOperator(CharmBase):
         ]
         if len(new_menu_links) != len(old_sidebar_config["menuLinks"]):
             old_sidebar_config["menuLinks"] = new_menu_links
-            self._context["links"] = json.dumps(old_sidebar_config)
-            try:
-                self.k8s_resource_handler.context = self._context
-                self.k8s_resource_handler.template_files = [
-                    self._resource_files["config_maps"]
-                ]
-                self.k8s_resource_handler.apply()
-            except ApiError:
-                self.logger.error(traceback.format_exc())
-                self.unit.status = BlockedStatus("kubernetes resource creation failed")
+            self._update_sidebar_config(old_sidebar_config)
         self.model.unit.status = ActiveStatus()
 
     def _on_remove(self, event):
