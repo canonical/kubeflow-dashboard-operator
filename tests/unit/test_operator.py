@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 import yaml
 
+from lightkube import ApiError
 from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
@@ -37,6 +38,32 @@ DEFAULT_RESOURCE_FILES = [
     "auth_manifests.yaml.j2",
     "configmaps.yaml.j2",
 ]
+
+
+class _FakeResponse:
+    """Used to fake an httpx response during testing only."""
+
+    def __init__(self, code):
+        self.code = code
+        self.name = ""
+
+    def json(self):
+        reason = ""
+        if self.code == 409:
+            reason = "AlreadyExists"
+        return {
+            "apiVersion": 1,
+            "code": self.code,
+            "message": "broken",
+            "reason": reason,
+        }
+
+
+class _FakeApiError(ApiError):
+    """Used to simulate an ApiError during testing."""
+
+    def __init__(self, code=400):
+        super().__init__(response=_FakeResponse(code))
 
 
 class _FakeChangeError(ChangeError):
@@ -215,4 +242,17 @@ class TestCharm:
         harness_with_profiles.charm.on.remove.emit()
         k8s_resource_handler.assert_has_calls([mock.call.render_manifests()])
         delete_many.assert_called()
-        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.delete_many")
+    def test_on_remove_failure(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        delete_many.side_effect = _FakeApiError()
+        harness_with_profiles.begin()
+        with pytest.raises(ApiError):
+            harness_with_profiles.charm.on.remove.emit()
