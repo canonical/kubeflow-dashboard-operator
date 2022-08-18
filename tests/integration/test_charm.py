@@ -9,7 +9,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from lightkube import Client, ApiError
+from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
 from selenium.common.exceptions import (
