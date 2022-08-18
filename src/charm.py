@@ -136,7 +136,7 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _check_container_connection(self):
         if not self.container.can_connect():
-            raise CheckFailed("Waiting for pod startup to complete", WaitingStatus)
+            raise CheckFailed("Pod startup is not complete", BlockedStatus)
 
     def _check_model_name(self):
         if self.model.name != "kubeflow":
