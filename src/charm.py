@@ -146,7 +146,7 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _check_container_connection(self):
         if not self.container.can_connect():
-            raise CheckFailed("Waiting for pod startup to complete", WaitingStatus)
+            raise CheckFailed("Pod startup is not complete", MaintenanceStatus)
 
     def _check_model_name(self):
         if self.model.name != "kubeflow":
@@ -207,7 +207,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
-    def main(self, event) -> None:
+    def main(self, _) -> None:
         """Main entry point for the Charm."""
         try:
             self._check_container_connection()
@@ -300,16 +300,16 @@ class KubeflowDashboardOperator(CharmBase):
             self._update_sidebar_config(old_sidebar_config)
         self.model.unit.status = ActiveStatus()
 
-    def _on_remove(self, event):
+    def _on_remove(self, _):
         self.unit.status = MaintenanceStatus("Removing k8s resources")
         self.k8s_resource_handler._template_files = DEFAULT_RESOURCE_FILES.values()
         manifests = self.k8s_resource_handler.render_manifests()
-        self.logger.info(f"MANIFESTS are {manifests}")
         try:
             delete_many(self.k8s_resource_handler.lightkube_client, manifests)
         except ApiError as e:
-            self.logger.warning(f"Failed to delete resources: {e}")
-        self.model.unit.status = ActiveStatus()
+            self.logger.warning(f"Failed to delete resources: {manifests} with: {e}")
+            raise e
+        self.unit.status = MaintenanceStatus("K8s resources removed")
 
 
 if __name__ == "__main__":

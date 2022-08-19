@@ -110,12 +110,6 @@ class TestCharm:
         assert harness.charm.model.unit.status == WaitingStatus(
             "Waiting for leadership"
         )
-        assert (
-            "status_set",
-            "waiting",
-            "Waiting for leadership",
-            {"is_app": False},
-        ) in harness._get_backend_calls()
         harness.set_leader(True)
         assert harness.charm.model.unit.status != WaitingStatus(
             "Waiting for leadership"
@@ -129,12 +123,6 @@ class TestCharm:
         assert harness.charm.model.unit.status != WaitingStatus(
             "Waiting for leadership"
         )
-        assert (
-            "status_set",
-            "waiting",
-            "Waiting for leadership",
-            {"is_app": False},
-        ) not in harness._get_backend_calls()
 
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -347,4 +335,17 @@ class TestCharm:
         harness_with_profiles.charm.on.remove.emit()
         k8s_resource_handler.assert_has_calls([mock.call.render_manifests()])
         delete_many.assert_called()
-        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.delete_many")
+    def test_on_remove_failure(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        delete_many.side_effect = _FakeApiError()
+        harness_with_profiles.begin()
+        with pytest.raises(ApiError):
+            harness_with_profiles.charm.on.remove.emit()

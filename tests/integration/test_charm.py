@@ -9,7 +9,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from lightkube import Client, ApiError
+from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -123,12 +123,6 @@ async def test_add_profile_relation(ops_test: OpsTest):
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
-
-
-@pytest.mark.asyncio
-async def test_configmap_exist(lightkube_client: Client):
-    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    assert configmap is not None
 
 
 @pytest.mark.asyncio
@@ -268,14 +262,3 @@ async def test_configmap_link_removed_on_removed_sidebar_relation(
     with pytest.raises(TimeoutException):
         script = fix_queryselector(["main-page", "iframe-link[href='/tensorboard/']"])
         wait.until(lambda x: x.execute_script(script))
-
-
-@pytest.mark.asyncio
-async def test_charm_removal(ops_test: OpsTest, lightkube_client: Client):
-    await ops_test.model.remove_application(CHARM_NAME, block_until_done=True)
-
-    # Ensure that the configmap is gone
-    try:
-        _ = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    except ApiError as e:
-        assert e.status.code == 404
