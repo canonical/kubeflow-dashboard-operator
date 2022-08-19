@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 from unittest import mock
 
 import pytest
+
 import json
 import yaml
 
@@ -29,6 +30,7 @@ RELATION_DATA = [
         "icon": "assessment",
     }
 ]
+
 DEFAULT_CONTEXT = {
     "app_name": "kubeflow-dashboard",
     "namespace": "kubeflow",

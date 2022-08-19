@@ -88,7 +88,6 @@ class KubeflowDashboardOperator(CharmBase):
         self.framework.observe(
             self.on.sidebar_relation_broken, self._on_sidebar_relation_broken
         )
-
         self.framework.observe(self.on.remove, self._on_remove)
 
     @property
@@ -207,6 +206,9 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
+    def _get_data_from_profiles_interface(self, kf_profiles_interface):
+        return list(kf_profiles_interface.get_data().values())[0]
+
     def main(self, _) -> None:
         """Main entry point for the Charm."""
         try:
@@ -214,7 +216,7 @@ class KubeflowDashboardOperator(CharmBase):
             self._check_model_name()
             self._check_leader()
             interfaces = self._get_interfaces()
-            kf_profiles = self._check_kf_profiles(interfaces)
+            kf_profiles_interface = self._check_kf_profiles(interfaces)
             self.handle_ingress(interfaces)
         except CheckFailed as e:
             self.model.unit.status = e.status
@@ -227,7 +229,7 @@ class KubeflowDashboardOperator(CharmBase):
             self.unit.status = BlockedStatus("kubernetes resource creation failed")
             return
         self.handle_ingress(interfaces)
-        kf_profiles = list(kf_profiles.get_data().values())[0]
+        kf_profiles = self._get_data_from_profiles_interface(kf_profiles_interface)
         self.profiles_service = kf_profiles["service-name"]
         try:
             self._update_layer()
