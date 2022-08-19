@@ -4,7 +4,6 @@ from unittest.mock import patch, MagicMock
 from unittest import mock
 
 import pytest
-
 import json
 import yaml
 
@@ -14,7 +13,6 @@ from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 from pathlib import Path
-
 from charm import KubeflowDashboardOperator
 
 
