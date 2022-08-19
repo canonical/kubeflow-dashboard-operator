@@ -1,73 +1,90 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
+from unittest.mock import patch, MagicMock
+from unittest import mock
 
 import pytest
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops.testing import Harness
 import yaml
 
-from charm import Operator
+from lightkube import ApiError
+from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
+from ops.pebble import ChangeError
+from ops.testing import Harness
+from pathlib import Path
+
+from charm import KubeflowDashboardOperator
 
 
-@pytest.fixture
-def harness():
-    harness = Harness(Operator)
+BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CHARM_NAME = METADATA["name"]
+RELATION_DATA = {
+    "app": "tensorboards-web-app",
+    "type": "item",
+    "link": "/tensorboards/",
+    "text": "Tensorboards",
+    "icon": "assessment",
+}
+DEFAULT_CONTEXT = {
+    "app_name": "kubeflow-dashboard",
+    "namespace": "kubeflow",
+    "configmap_name": "centraldashboard-config",
+    "profilename": "test-profile",
+    "links": BASE_SIDEBAR,
+    "settings": "",
+}
+DEFAULT_RESOURCE_FILES = [
+    "profile_crds.yaml.j2",
+    "auth_manifests.yaml.j2",
+    "configmaps.yaml.j2",
+]
+
+
+class _FakeResponse:
+    """Used to fake an httpx response during testing only."""
+
+    def __init__(self, code):
+        self.code = code
+        self.name = ""
+
+    def json(self):
+        reason = ""
+        if self.code == 409:
+            reason = "AlreadyExists"
+        return {
+            "apiVersion": 1,
+            "code": self.code,
+            "message": "broken",
+            "reason": reason,
+        }
+
+
+class _FakeApiError(ApiError):
+    """Used to simulate an ApiError during testing."""
+
+    def __init__(self, code=400):
+        super().__init__(response=_FakeResponse(code))
+
+
+class _FakeChangeError(ChangeError):
+    """Used to simulate a ChangeError during testing."""
+
+    def __init__(self, err, change):
+        super().__init__(err, change)
+
+
+@pytest.fixture(scope="function")
+def harness() -> Harness:
+    harness = Harness(KubeflowDashboardOperator)
     # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
     harness.set_model_name("kubeflow")
-    return harness
+    yield harness
+    harness.cleanup()
 
 
-def test_not_kubeflow_model():
-    # Tests that unit will BlockStatus if deployed outside a model named kubeflow
-    # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
-    harness = Harness(Operator)
-    harness.begin_with_initial_hooks()
-    assert harness.charm.model.unit.status == BlockedStatus(
-        "kubeflow-dashboard must be deployed to model named `kubeflow`:"
-        " https://git.io/J6d35"
-    )
-
-
-def test_not_leader(harness):
-    harness.begin_with_initial_hooks()
-    assert harness.charm.model.unit.status == WaitingStatus("Waiting for leadership")
-
-
-def test_missing_image(harness):
+@pytest.fixture(scope="function")
+def harness_with_profiles(harness: Harness) -> Harness:
     harness.set_leader(True)
-    harness.begin_with_initial_hooks()
-    assert harness.charm.model.unit.status == BlockedStatus(
-        "Missing resource: oci-image"
-    )
-
-
-def test_no_relation(harness):
-    harness.set_leader(True)
-    harness.add_oci_resource(
-        "oci-image",
-        {
-            "registrypath": "ci-test",
-            "username": "",
-            "password": "",
-        },
-    )
-    harness.begin_with_initial_hooks()
-
-    assert harness.charm.model.unit.status == WaitingStatus(
-        "Waiting for kubeflow-profiles relation data"
-    )
-
-
-def test_with_relation(harness):
-    harness.set_leader(True)
-    harness.add_oci_resource(
-        "oci-image",
-        {
-            "registrypath": "ci-test",
-            "username": "",
-            "password": "",
-        },
-    )
     rel_id = harness.add_relation("kubeflow-profiles", "app")
 
     harness.add_relation_unit(rel_id, "app/0")
@@ -77,10 +94,153 @@ def test_with_relation(harness):
         "app",
         {"_supported_versions": "- v1", "data": yaml.dump(data)},
     )
-    harness.begin_with_initial_hooks()
+    yield harness
+    harness.cleanup()
 
-    _, k8s = harness.get_pod_spec()
-    expected = yaml.safe_load(open("src/config.json"))
-    got = yaml.safe_load(k8s["configMaps"]["centraldashboard-config"]["links"])
-    assert got == expected
-    assert isinstance(harness.charm.model.unit.status, ActiveStatus)
+
+class TestCharm:
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    def test_check_leader_failure(self, harness: Harness):
+        harness.begin_with_initial_hooks()
+        assert harness.charm.model.unit.status == WaitingStatus(
+            "Waiting for leadership"
+        )
+        harness.set_leader(True)
+        assert harness.charm.model.unit.status != WaitingStatus(
+            "Waiting for leadership"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_check_leader_success(self, harness: Harness):
+        harness.set_leader(True)
+        harness.begin_with_initial_hooks()
+        assert harness.charm.model.unit.status != WaitingStatus(
+            "Waiting for leadership"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_check_model_name_failure(self):
+        # Tests that unit will BlockStatus if deployed outside a model named kubeflow
+        # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
+        harness = Harness(KubeflowDashboardOperator)
+        harness.begin_with_initial_hooks()
+        assert harness.charm.model.unit.status == BlockedStatus(
+            "kubeflow-dashboard must be deployed to model named `kubeflow`:"
+            " https://git.io/J6d35"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_check_model_name_success(self, harness: Harness):
+        harness.begin_with_initial_hooks()
+        assert harness.charm.model.unit.status != BlockedStatus(
+            "kubeflow-dashboard must be deployed to model named `kubeflow`:"
+            " https://git.io/J6d35"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_check_kf_profiles_failure(self, harness: Harness):
+        harness.set_leader(True)
+        harness.begin_with_initial_hooks()
+
+        assert harness.charm.model.unit.status == WaitingStatus(
+            "Waiting for kubeflow-profiles relation data"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_check_kf_profiles_success(self, harness_with_profiles: Harness):
+        harness_with_profiles.begin_with_initial_hooks()
+
+        assert harness_with_profiles.charm.model.unit.status != WaitingStatus(
+            "Waiting for kubeflow-profiles relation data"
+        )
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_update_layer_success(self, harness_with_profiles: Harness):
+        harness_with_profiles.container_pebble_ready(CHARM_NAME)
+        harness_with_profiles.begin_with_initial_hooks()
+        assert (
+            harness_with_profiles.get_container_pebble_plan(CHARM_NAME)._services
+            is not None
+        )
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.container")
+    def test_update_layer_failure(
+        self,
+        container: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        container.replan.side_effect = _FakeChangeError(
+            "Fake problem during layer update", None
+        )
+        harness_with_profiles.container_pebble_ready(CHARM_NAME)
+        harness_with_profiles.begin_with_initial_hooks()
+        assert harness_with_profiles.charm.model.unit.status == BlockedStatus(
+            "Failed to replan"
+        )
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    def test_create_resources_success(
+        self,
+        k8s_resource_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.on.install.emit()
+        k8s_resource_handler.apply.assert_called_once()
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.KubeflowDashboardOperator._update_layer")
+    def test_main(
+        self,
+        update_layer: MagicMock,
+        k8s_resource_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        expected_links = BASE_SIDEBAR
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.on.install.emit()
+        k8s_resource_handler.apply.assert_called()
+        update_layer.assert_called()
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+        assert harness_with_profiles.charm._context["links"] == expected_links
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.delete_many")
+    def test_on_remove_success(
+        self,
+        delete_many: MagicMock,
+        k8s_resource_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.on.remove.emit()
+        k8s_resource_handler.assert_has_calls([mock.call.render_manifests()])
+        delete_many.assert_called()
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.delete_many")
+    def test_on_remove_failure(
+        self,
+        delete_many: MagicMock,
+        _: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        delete_many.side_effect = _FakeApiError()
+        harness_with_profiles.begin()
+        with pytest.raises(ApiError):
+            harness_with_profiles.charm.on.remove.emit()
