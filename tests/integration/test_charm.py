@@ -9,7 +9,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from lightkube import Client, ApiError
+from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -188,14 +188,3 @@ async def test_configmap_contents(lightkube_client: Client):
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
-
-
-@pytest.mark.asyncio
-async def test_charm_removal(ops_test: OpsTest, lightkube_client: Client):
-    await ops_test.model.remove_application(CHARM_NAME, block_until_done=True)
-
-    # Ensure that the configmap is gone
-    try:
-        _ = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    except ApiError as e:
-        assert e.status.code == 404
