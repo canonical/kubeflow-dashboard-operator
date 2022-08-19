@@ -124,12 +124,6 @@ async def test_status(ops_test: OpsTest):
 
 
 @pytest.mark.asyncio
-async def test_configmap_exist(lightkube_client: Client):
-    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    assert configmap is not None
-
-
-@pytest.mark.asyncio
 def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
 

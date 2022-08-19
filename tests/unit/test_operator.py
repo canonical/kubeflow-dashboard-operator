@@ -106,12 +106,6 @@ class TestCharm:
         assert harness.charm.model.unit.status == WaitingStatus(
             "Waiting for leadership"
         )
-        assert (
-            "status_set",
-            "waiting",
-            "Waiting for leadership",
-            {"is_app": False},
-        ) in harness._get_backend_calls()
         harness.set_leader(True)
         assert harness.charm.model.unit.status != WaitingStatus(
             "Waiting for leadership"
@@ -125,12 +119,6 @@ class TestCharm:
         assert harness.charm.model.unit.status != WaitingStatus(
             "Waiting for leadership"
         )
-        assert (
-            "status_set",
-            "waiting",
-            "Waiting for leadership",
-            {"is_app": False},
-        ) not in harness._get_backend_calls()
 
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
