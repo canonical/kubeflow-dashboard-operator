@@ -8,12 +8,11 @@ import json
 import yaml
 
 from lightkube import ApiError
-from lightkube.resources.core_v1 import ConfigMap
 from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 from pathlib import Path
-from charm import KubeflowDashboardOperator
+from charm import KubeflowDashboardOperator, CheckFailed
 
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
@@ -201,7 +200,7 @@ class TestCharm:
     ):
         harness_with_profiles.begin()
         harness_with_profiles.charm.on.install.emit()
-        k8s_resource_handler.apply.assert_called_once()
+        k8s_resource_handler.apply.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -213,72 +212,76 @@ class TestCharm:
         k8s_resource_handler: MagicMock,
         harness_with_profiles: Harness,
     ):
-        expected_links = BASE_SIDEBAR
         harness_with_profiles.begin()
         harness_with_profiles.charm.on.install.emit()
         k8s_resource_handler.apply.assert_called()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-        assert harness_with_profiles.charm._context["links"] == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    def test_get_sidebar_config_success(
-        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
-    ):
-        fake_links = {}
-        harness_with_profiles.begin()
-        k8s_resource_handler.lightkube_client.get.return_value = ConfigMap(
-            data={"links": json.dumps(fake_links)}
+    def test_get_new_sidebar_configs_added(self, harness_with_profiles: Harness):
+        relation_id = harness_with_profiles.add_relation(
+            "sidebar", "tensorboards-web-app"
         )
-        res = harness_with_profiles.charm._get_sidebar_config()
-        k8s_resource_handler.lightkube_client.get.assert_called_once()
-        assert res == fake_links
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    def test_get_sidebar_config_failure(
-        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
-    ):
-        harness_with_profiles.begin()
-        k8s_resource_handler.lightkube_client.get.side_effect = _FakeApiError()
-        try:
-            harness_with_profiles.charm._get_sidebar_config()
-        except ApiError:
-            pytest.fail("Unexpected ApiError")
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    def test_update_sidebar_config_success(
-        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
-    ):
-        harness_with_profiles.begin()
-        harness_with_profiles.charm._update_sidebar_config(json.loads(BASE_SIDEBAR))
-        k8s_resource_handler.apply.assert_called_once()
-        assert json.loads(harness_with_profiles.charm._context["links"]) == json.loads(
-            BASE_SIDEBAR
+        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
+        harness_with_profiles.update_relation_data(
+            relation_id,
+            "tensorboards-web-app",
+            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
         )
+        harness_with_profiles.begin()
+        res = harness_with_profiles.charm._get_new_sidebar_configs()
+        assert res == RELATION_DATA
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    def test_update_sidebar_config_failed(
+    def test_get_new_sidebar_configs_removed(self, harness_with_profiles: Harness):
+        relation_id = harness_with_profiles.add_relation(
+            "sidebar", "tensorboards-web-app"
+        )
+        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
+        harness_with_profiles.update_relation_data(
+            relation_id,
+            "tensorboards-web-app",
+            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
+        )
+        harness_with_profiles.remove_relation(relation_id)
+        harness_with_profiles.begin()
+        res = harness_with_profiles.charm._get_new_sidebar_configs()
+        assert res == []
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubernetesResourceHandler")
+    def test_update_configmap_success(
         self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
     ):
+        handler_object: MagicMock = k8s_resource_handler()
         harness_with_profiles.begin()
-        k8s_resource_handler.apply.side_effect = _FakeApiError()
-        harness_with_profiles.charm._update_sidebar_config(json.loads(BASE_SIDEBAR))
-        assert isinstance(harness_with_profiles.charm.model.unit.status, BlockedStatus)
+        harness_with_profiles.charm._update_configmap(
+            json.loads(BASE_SIDEBAR)["menuLinks"]
+        )
+        handler_object.apply.assert_called()
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubernetesResourceHandler")
+    def test_update_configmap_failed(
+        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
+    ):
+        handler_object: MagicMock = k8s_resource_handler()
+        harness_with_profiles.begin()
+        handler_object.apply.side_effect = _FakeApiError()
+        with pytest.raises(CheckFailed):
+            harness_with_profiles.charm._update_configmap(json.loads(BASE_SIDEBAR))
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
     @patch(
-        "charm.KubeflowDashboardOperator._get_sidebar_config",
-        return_value=json.loads(BASE_SIDEBAR),
+        "charm.KubeflowDashboardOperator._get_new_sidebar_configs",
+        return_value=RELATION_DATA,
     )
     # @patch("charm.KubeflowDashboardOperator._update_sidebar_config", return_value={})
     def test_on_sidebar_relation_changed(
         self,
-        get_sidebar_config: MagicMock,
+        get_new_sidebar_configs: MagicMock,
         k8s_resource_handler: MagicMock,
         harness_with_profiles: Harness,
     ):
@@ -295,31 +298,10 @@ class TestCharm:
             {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
         )
         harness_with_profiles.begin_with_initial_hooks()
-        get_sidebar_config.assert_called()
+        get_new_sidebar_configs.assert_called()
         assert harness_with_profiles.charm._context["links"] == json.dumps(
             expected_links
         )
-        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    def test_on_sidebar_relation_removed(
-        self, k8s_resource_handler: MagicMock, harness_with_profiles: Harness
-    ):
-        # Expected tensorboard link data
-        relation_id = harness_with_profiles.add_relation(
-            "sidebar", "tensorboards-web-app"
-        )
-        harness_with_profiles.add_relation_unit(relation_id, "tensorboards-web-app/0")
-        harness_with_profiles.update_relation_data(
-            relation_id,
-            "tensorboards-web-app",
-            {"_supported_versions": "- v1", "config": json.dumps(RELATION_DATA)},
-        )
-        harness_with_profiles.remove_relation(relation_id)
-        harness_with_profiles.begin_with_initial_hooks()
-        k8s_resource_handler.apply.assert_called()
-        assert harness_with_profiles.charm._context["links"] == BASE_SIDEBAR
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
