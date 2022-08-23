@@ -244,6 +244,7 @@ class KubeflowDashboardOperator(CharmBase):
             self.configmap_handler.apply()
         except ApiError:
             raise CheckFailed("kubernetes resource creation failed", BlockedStatus)
+        self.model.unit.status = ActiveStatus()
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]
