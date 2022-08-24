@@ -15,6 +15,7 @@ from selenium import webdriver
 from selenium.common.exceptions import (
     JavascriptException,
     WebDriverException,
+    TimeoutException,
 )
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -26,6 +27,7 @@ CHARM_NAME = METADATA["name"]
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
 PROFILES_CHARM_NAME = "kubeflow-profiles"
+TENSORBOARD_CHARM_NAME = "tensorboards-web-app"
 
 
 @pytest_asyncio.fixture
@@ -127,23 +129,6 @@ async def test_status(ops_test: OpsTest):
 def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
     driver, wait, url = driver
 
-    # Ensure that sidebar links are set up properly
-    links = [
-        "/jupyter/",
-        "/pipeline/#/experiments",
-        "/pipeline/#/pipelines",
-        "/pipeline/#/runs",
-        "/pipeline/#/recurringruns",
-        "/volumes/",
-        "/katib/",
-        "/tensorboards/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
-        wait.until(lambda x: x.execute_script(script))
-
     # Ensure that quick links are set up properly
     links = [
         "/pipeline/",
@@ -183,8 +168,97 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
 
 @pytest.mark.asyncio
+async def test_default_sidebar_links_missing_tensorboards(
+    driver: Tuple[webdriver.Chrome, WebDriverWait, str]
+):
+    driver, wait, url = driver
+    with pytest.raises(TimeoutException):
+        script = fix_queryselector(["main-page", "iframe-link[href='/tensorboards/']"])
+        wait.until(lambda x: x.execute_script(script))
+
+
+@pytest.mark.asyncio
 async def test_configmap_contents(lightkube_client: Client):
     expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])
     assert links == expected_links
+
+
+@pytest.mark.asyncio
+@pytest.mark.abort_on_fail
+async def test_add_sidebar_tensorboard_relation(ops_test: OpsTest):
+    await ops_test.model.deploy(
+        TENSORBOARD_CHARM_NAME, channel="latest/edge", trust=True
+    )  # This assumes that the chages were merged
+    await ops_test.model.relate(
+        f"{TENSORBOARD_CHARM_NAME}:sidebar", f"{CHARM_NAME}:sidebar"
+    )
+    await ops_test.model.wait_for_idle(
+        [TENSORBOARD_CHARM_NAME],
+        raise_on_blocked=True,
+        raise_on_error=True,
+        timeout=300,
+    )
+
+
+@pytest.mark.asyncio
+def test_configmap_link_added_on_new_sidebar_relation(lightkube_client: Client):
+    tensorboard_link = {
+        "app": TENSORBOARD_CHARM_NAME,
+        "type": "item",
+        "link": "/tensorboards/",
+        "text": "Tensorboards",
+        "icon": "assessment",
+    }
+    base_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
+    base_links["menuLinks"] = base_links["menuLinks"] + [tensorboard_link]
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME)
+    links = json.loads(configmap.data["links"])
+    assert links == base_links
+
+
+@pytest.mark.asyncio
+async def test_tensorboard_added_sidebar_links(
+    driver: Tuple[webdriver.Chrome, WebDriverWait, str]
+):
+    driver, wait, url = driver
+
+    # Ensure that sidebar links are set up properly
+    links = [
+        "/tensorboards/",
+    ]
+
+    for link in links:
+        print("Looking for link: %s" % link)
+        script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
+        wait.until(lambda x: x.execute_script(script))
+
+
+@pytest.mark.asyncio
+async def test_configmap_link_removed_on_removed_sidebar_relation(
+    ops_test: OpsTest,
+    driver: Tuple[webdriver.Chrome, WebDriverWait, str],
+    lightkube_client: Client,
+):
+    expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
+    await ops_test.run(
+        "juju",
+        "remove-relation",
+        f"{TENSORBOARD_CHARM_NAME}:sidebar",
+        f"{CHARM_NAME}:sidebar",
+    )
+    await ops_test.model.wait_for_idle(
+        [CHARM_NAME],
+        status="active",
+        raise_on_blocked=True,
+        raise_on_error=True,
+        timeout=300,
+    )
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME)
+    links = json.loads(configmap.data["links"])
+    assert links == expected_links
+    driver, wait, url = driver
+    with pytest.raises(TimeoutException):
+        script = fix_queryselector(["main-page", "iframe-link[href='/tensorboard/']"])
+        wait.until(lambda x: x.execute_script(script))

@@ -4,18 +4,27 @@
 
 import json
 import logging
-import traceback
 
 from pathlib import Path
+from typing import Dict, List
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from lightkube.models.core_v1 import ServicePort
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    WaitingStatus,
+    Relation,
+    RelationData,
+    RelationDataContent,
+)
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import (
     NoCompatibleVersions,
@@ -23,12 +32,13 @@ from serialized_data_interface import (
     get_interfaces,
 )
 
-BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
-DEFAULT_RESOURCE_FILES = {
-    "profiles": "src/templates/profile_crds.yaml.j2",
-    "auths": "src/templates/auth_manifests.yaml.j2",
-    "config_maps": "src/templates/configmaps.yaml.j2",
-}
+BASE_SIDEBAR = json.loads(Path("src/config/sidebar_config.json").read_text())
+K8S_RESOURCE_FILES = [
+    "src/templates/profile_crds.yaml.j2",
+    "src/templates/auth_manifests.yaml.j2",
+]
+CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
+SIDEBAR_RELATION_NAME = "sidebar"
 
 
 class CheckFailed(Exception):
@@ -56,19 +66,18 @@ class KubeflowDashboardOperator(CharmBase):
         self._service = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
-        self._resource_files = DEFAULT_RESOURCE_FILES
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
-            "configmap_name": self.model.config["dashboard-configmap"],
-            "profilename": self.model.config["profile"],
-            "links": BASE_SIDEBAR,
+            "configmap_name": self.configmap_name,
+            "profilename": self.profilename,
+            "links": json.dumps(BASE_SIDEBAR),
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
         self._k8s_resource_handler = None
-        self.service_patcher = KubernetesServicePatch(
-            self, [(self._container_name, self.model.config["port"])]
-        )
+        self._configmap_handler = None
+        port = ServicePort(int(self.port), name=f"{self.app.name}")
+        self.service_patcher = KubernetesServicePatch(self, [port])
         for event in [
             self.on.install,
             self.on.leader_elected,
@@ -77,9 +86,27 @@ class KubeflowDashboardOperator(CharmBase):
             self.on["kubeflow-profiles"].relation_changed,
             self.on["ingress"].relation_changed,
             self.on.kubeflow_dashboard_pebble_ready,
+            self.on.sidebar_relation_changed,
+            self.on.sidebar_relation_broken,
         ]:
             self.framework.observe(event, self.main)
-            self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.remove, self._on_remove)
+
+    @property
+    def configmap_name(self):
+        return self.model.config["dashboard-configmap"]
+
+    @property
+    def profilename(self):
+        return self.model.config["profile"]
+
+    @property
+    def port(self):
+        return self.model.config["port"]
+
+    @property
+    def registration_flow(self):
+        return self.model.config["registration-flow"]
 
     @property
     def profiles_service(self):
@@ -98,7 +125,7 @@ class KubeflowDashboardOperator(CharmBase):
         if not self._k8s_resource_handler:
             self._k8s_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
-                template_files=self._resource_files.values(),
+                template_files=K8S_RESOURCE_FILES,
                 context=self._context,
                 logger=self.logger,
             )
@@ -108,6 +135,22 @@ class KubeflowDashboardOperator(CharmBase):
     @k8s_resource_handler.setter
     def k8s_resource_handler(self, handler: KubernetesResourceHandler):
         self._k8s_resource_handler = handler
+
+    @property
+    def configmap_handler(self):
+        if not self._configmap_handler:
+            self._configmap_handler = KubernetesResourceHandler(
+                field_manager=self._lightkube_field_manager,
+                template_files=[CONFIGMAP_FILE],
+                context=self._context,
+                logger=self.logger,
+            )
+        load_in_cluster_generic_resources(self._k8s_resource_handler.lightkube_client)
+        return self._configmap_handler
+
+    @configmap_handler.setter
+    def configmap_handler(self, handler: KubernetesResourceHandler):
+        self._configmap_handler = handler
 
     @property
     def _kubeflow_dashboard_operator_layer(self) -> Layer:
@@ -124,10 +167,8 @@ class KubeflowDashboardOperator(CharmBase):
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
-                        "REGISTRATION_FLOW": self.model.config["registration-flow"],
-                        "DASHBOARD_LINKS_CONFIGMAP": self.model.config[
-                            "dashboard-configmap"
-                        ],
+                        "REGISTRATION_FLOW": self.registration_flow,
+                        "DASHBOARD_CONFIGMAP": self.configmap_name,
                     },
                 }
             },
@@ -155,7 +196,6 @@ class KubeflowDashboardOperator(CharmBase):
         """Updates the Pebble configuration layer if changed."""
         current_layer = self.container.get_plan()
         new_layer = self._kubeflow_dashboard_operator_layer
-        self.logger.debug(f"NEW LAYER: {new_layer}")
         if current_layer.services != new_layer.services:
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
             self.container.add_layer(self._container_name, new_layer, combine=True)
@@ -176,14 +216,14 @@ class KubeflowDashboardOperator(CharmBase):
             raise CheckFailed(err, BlockedStatus)
         return interfaces
 
-    def handle_ingress(self, interfaces):
+    def _handle_ingress(self, interfaces):
         if interfaces["ingress"]:
             interfaces["ingress"].send_data(
                 {
                     "prefix": "/",
                     "rewrite": "/",
                     "service": self.model.app.name,
-                    "port": self.model.config["port"],
+                    "port": self.port,
                 }
             )
 
@@ -197,6 +237,15 @@ class KubeflowDashboardOperator(CharmBase):
 
         return kf_profiles
 
+    def _deploy_k8s_resources(self) -> None:
+        try:
+            self.unit.status = MaintenanceStatus("Creating k8s resources")
+            self.k8s_resource_handler.apply()
+            self.configmap_handler.apply()
+        except ApiError:
+            raise CheckFailed("kubernetes resource creation failed", BlockedStatus)
+        self.model.unit.status = ActiveStatus()
+
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]
 
@@ -208,35 +257,64 @@ class KubeflowDashboardOperator(CharmBase):
             self._check_leader()
             interfaces = self._get_interfaces()
             kf_profiles_interface = self._check_kf_profiles(interfaces)
-            self.handle_ingress(interfaces)
-        except CheckFailed as e:
-            self.model.unit.status = e.status
-            return
-        try:
-            self.unit.status = MaintenanceStatus("Creating k8s resources")
-            self.k8s_resource_handler.apply()
-        except ApiError:
-            self.logger.error(traceback.format_exc())
-            self.unit.status = BlockedStatus("kubernetes resource creation failed")
-            return
-        self.handle_ingress(interfaces)
-        kf_profiles = self._get_data_from_profiles_interface(kf_profiles_interface)
-        self.profiles_service = kf_profiles["service-name"]
-        try:
+            self._handle_ingress(interfaces)
+            self._deploy_k8s_resources()
+            kf_profiles = self._get_data_from_profiles_interface(kf_profiles_interface)
+            self.profiles_service = kf_profiles["service-name"]
             self._update_layer()
+            self._update_sidebar_configs()
         except CheckFailed as e:
             self.model.unit.status = e.status
             return
         self.model.unit.status = ActiveStatus()
 
+    def _get_new_sidebar_configs(self) -> Dict:
+        configs = []
+        sidebar_relations: List[Relation] = self.model.relations[SIDEBAR_RELATION_NAME]
+        for r in sidebar_relations:
+            data: RelationData = r.data
+            app_data: RelationDataContent = data[r.app]
+            configs += json.loads(app_data["config"])
+        return sorted(configs, key=lambda x: x.get("position", 100))
+
+    def _update_sidebar_configs(self):
+        new_sidebar_configs = self._get_new_sidebar_configs()
+        self.logger.info(
+            f"New sidebar configs found {new_sidebar_configs} updating configmap"
+        )
+        try:
+            self._update_configmap(new_sidebar_configs)
+        except CheckFailed as e:
+            raise e
+
+    def _update_configmap(self, links_data: Dict) -> None:
+        BASE_SIDEBAR["menuLinks"] = links_data
+        self._context["links"] = json.dumps(BASE_SIDEBAR)
+        # We must recreate handler as chisme caches manifests
+        config_handler = KubernetesResourceHandler(
+            field_manager=self._lightkube_field_manager,
+            template_files=[CONFIGMAP_FILE],
+            context=self._context,
+            logger=self.logger,
+        )
+        try:
+            config_handler.apply()
+        except ApiError as e:
+            raise CheckFailed(
+                f"kubernetes resource creation failed with {e}", BlockedStatus
+            )
+
     def _on_remove(self, _):
         self.unit.status = MaintenanceStatus("Removing k8s resources")
-        self.k8s_resource_handler._template_files = DEFAULT_RESOURCE_FILES.values()
-        manifests = self.k8s_resource_handler.render_manifests()
+        k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
+        configmap_manifest = self.configmap_handler.render_manifests()
         try:
-            delete_many(self.k8s_resource_handler.lightkube_client, manifests)
+            delete_many(
+                self.k8s_resource_handler.lightkube_client, k8s_resources_manifests
+            )
+            delete_many(self.configmap_handler.lightkube_client, configmap_manifest)
         except ApiError as e:
-            self.logger.warning(f"Failed to delete resources: {manifests} with: {e}")
+            self.logger.warning(f"Failed to delete resources, with error: {e}")
             raise e
         self.unit.status = MaintenanceStatus("K8s resources removed")
 
