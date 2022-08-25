@@ -30,7 +30,6 @@ from serialized_data_interface import (
 
 BASE_SIDEBAR = json.loads(Path("src/config/sidebar_config.json").read_text())
 K8S_RESOURCE_FILES = [
-    "src/templates/profile_crds.yaml.j2",
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
