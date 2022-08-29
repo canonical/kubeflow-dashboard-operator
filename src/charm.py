@@ -10,13 +10,15 @@ from pathlib import Path
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charmed_kubeflow_chisme.pebble import update_layer
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, Layer
+from ops.pebble import Layer
 from serialized_data_interface import (
     NoCompatibleVersions,
     NoVersionsListed,
@@ -151,22 +153,6 @@ class KubeflowDashboardOperator(CharmBase):
         if not self.unit.is_leader():
             raise CheckFailed("Waiting for leadership", WaitingStatus)
 
-    def _update_layer(self) -> None:
-        """Updates the Pebble configuration layer if changed."""
-        current_layer = self.container.get_plan()
-        new_layer = self._kubeflow_dashboard_operator_layer
-        self.logger.debug(f"NEW LAYER: {new_layer}")
-        if current_layer.services != new_layer.services:
-            self.unit.status = MaintenanceStatus("Applying new pebble layer")
-            self.container.add_layer(self._container_name, new_layer, combine=True)
-            try:
-                self.logger.info(
-                    "Pebble plan updated with new configuration, replaning"
-                )
-                self.container.replan()
-            except ChangeError:
-                raise CheckFailed("Failed to replan", BlockedStatus)
-
     def _get_interfaces(self):
         try:
             interfaces = get_interfaces(self)
@@ -223,9 +209,18 @@ class KubeflowDashboardOperator(CharmBase):
         kf_profiles = self._get_data_from_profiles_interface(kf_profiles_interface)
         self.profiles_service = kf_profiles["service-name"]
         try:
-            self._update_layer()
-        except CheckFailed as e:
+            update_layer(
+                self._container_name,
+                self.container,
+                self._kubeflow_dashboard_operator_layer,
+                self.logger,
+            )
+        except ErrorWithStatus as e:
             self.model.unit.status = e.status
+            if isinstance(e.status, BlockedStatus):
+                self.logger.error(str(e.msg))
+            else:
+                self.logger.info(str(e.msg))
             return
         self.model.unit.status = ActiveStatus()
 

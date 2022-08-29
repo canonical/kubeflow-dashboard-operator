@@ -202,7 +202,7 @@ class TestCharm:
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
-    @patch("charm.KubeflowDashboardOperator._update_layer")
+    @patch("charm.update_layer")
     def test_main(
         self,
         update_layer: MagicMock,
