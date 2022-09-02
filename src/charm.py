@@ -61,17 +61,19 @@ class KubeflowDashboardOperator(CharmBase):
         self._service = "npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
+        self._configmap_name = self.model.config["dashboard-configmap"]
+        self._port = self.model.config["port"]
+        self._registration_flow = self.model.config["registration-flow"]
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
-            "configmap_name": self.configmap_name,
-            "profilename": self.profilename,
+            "configmap_name": self._configmap_name,
             "links": json.dumps(BASE_SIDEBAR),
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
         self._k8s_resource_handler = None
         self._configmap_handler = None
-        port = ServicePort(int(self.port), name=f"{self.app.name}")
+        port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(self, [port])
         for event in [
             self.on.install,
@@ -84,22 +86,6 @@ class KubeflowDashboardOperator(CharmBase):
         ]:
             self.framework.observe(event, self.main)
         self.framework.observe(self.on.remove, self._on_remove)
-
-    @property
-    def configmap_name(self):
-        return self.model.config["dashboard-configmap"]
-
-    @property
-    def profilename(self):
-        return self.model.config["profile"]
-
-    @property
-    def port(self):
-        return self.model.config["port"]
-
-    @property
-    def registration_flow(self):
-        return self.model.config["registration-flow"]
 
     @property
     def profiles_service(self):
@@ -160,8 +146,8 @@ class KubeflowDashboardOperator(CharmBase):
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
-                        "REGISTRATION_FLOW": self.registration_flow,
-                        "DASHBOARD_CONFIGMAP": self.configmap_name,
+                        "REGISTRATION_FLOW": self._registration_flow,
+                        "DASHBOARD_CONFIGMAP": self._configmap_name,
                     },
                 }
             },
@@ -216,7 +202,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "prefix": "/",
                     "rewrite": "/",
                     "service": self.model.app.name,
-                    "port": self.port,
+                    "port": self._port,
                 }
             )
 
