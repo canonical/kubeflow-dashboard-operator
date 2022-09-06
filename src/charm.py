@@ -5,7 +5,7 @@
 import json
 import logging
 import traceback
-
+import yaml
 from pathlib import Path
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
@@ -29,7 +29,7 @@ DEFAULT_RESOURCE_FILES = {
     "auths": "src/templates/auth_manifests.yaml.j2",
     "config_maps": "src/templates/configmaps.yaml.j2",
 }
-
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 class CheckFailed(Exception):
     """Raise this exception if one of the checks in main fails."""
@@ -128,6 +128,7 @@ class KubeflowDashboardOperator(CharmBase):
                         "DASHBOARD_LINKS_CONFIGMAP": self.model.config[
                             "dashboard-configmap"
                         ],
+                        "BUILD_VERSION": METADATA["resources"]["oci-image"]["upstream-source"].split(':')[1]
                     },
                 }
             },
