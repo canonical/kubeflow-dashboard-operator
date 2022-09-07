@@ -3,8 +3,8 @@
 from unittest.mock import patch, MagicMock
 from unittest import mock
 
-import pytest
 import json
+import pytest
 import yaml
 
 from lightkube import ApiError
@@ -102,8 +102,6 @@ def harness_with_profiles(harness: Harness) -> Harness:
 
 
 class TestCharm:
-    @patch("charm.KubeflowDashboardOperator.configmap_handler", MagicMock())
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_failure(self, harness: Harness):
         harness.begin_with_initial_hooks()
@@ -115,8 +113,6 @@ class TestCharm:
             "Waiting for leadership"
         )
 
-    @patch("charm.KubeflowDashboardOperator.configmap_handler", MagicMock())
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_success(self, harness: Harness):
         harness.set_leader(True)
@@ -125,7 +121,6 @@ class TestCharm:
             "Waiting for leadership"
         )
 
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_model_name_failure(self):
         # Tests that unit will BlockStatus if deployed outside a model named kubeflow
@@ -137,7 +132,6 @@ class TestCharm:
             " https://git.io/J6d35"
         )
 
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_model_name_success(self, harness: Harness):
         harness.begin_with_initial_hooks()
@@ -146,7 +140,6 @@ class TestCharm:
             " https://git.io/J6d35"
         )
 
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_kf_profiles_failure(self, harness: Harness):
         harness.set_leader(True)
@@ -157,8 +150,6 @@ class TestCharm:
         )
 
     @patch("charm.KubernetesResourceHandler")
-    @patch("charm.KubeflowDashboardOperator.configmap_handler", MagicMock())
-    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler", MagicMock())
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_kf_profiles_success(self, harness_with_profiles: Harness):
         harness_with_profiles.begin_with_initial_hooks()
@@ -196,9 +187,32 @@ class TestCharm:
     ):
         harness_with_profiles.begin()
         harness_with_profiles.charm._deploy_k8s_resources()
-        k8s_resource_handler.apply.assert_called()
-        configmap_handler.apply.assert_called()
+        k8s_resource_handler.apply.assert_called_once()
+        configmap_handler.apply.assert_called_once()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubernetesResourceHandler", MagicMock())
+    @patch("charm.KubeflowDashboardOperator.configmap_handler")
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.KubeflowDashboardOperator._update_layer")
+    def test_main(
+        self,
+        update_layer: MagicMock,
+        k8s_resource_handler: MagicMock,
+        configmap_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        expected_links = json.loads(BASE_SIDEBAR)
+        harness_with_profiles.begin()
+        harness_with_profiles.charm.on.install.emit()
+        k8s_resource_handler.apply.assert_called()
+        configmap_handler.apply.assert_called_once()
+        update_layer.assert_called()
+        assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
+        assert (
+            json.loads(harness_with_profiles.charm._context["links"]) == expected_links
+        )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_get_new_sidebar_configs_added(self, harness_with_profiles: Harness):
