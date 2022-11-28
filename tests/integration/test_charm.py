@@ -41,7 +41,7 @@ async def test_build_and_deploy(ops_test):
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test):
     charm_name = METADATA["name"]
-    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
+    await ops_test.model.deploy("kubeflow-profiles", channel="1.6/edge")
     await ops_test.model.add_relation("kubeflow-profiles", charm_name)
     await ops_test.model.wait_for_idle(
         ["kubeflow-profiles", charm_name],
