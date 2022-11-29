@@ -1,0 +1,9 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+charmed-kubeflow-chisme
+jinja2
+lightkube
+ops
+oci-image
+serialized-data-interface
