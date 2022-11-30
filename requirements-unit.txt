@@ -13,18 +13,31 @@ attrs==22.1.0
     #   -r ./requirements.txt
     #   jsonschema
     #   pytest
+bcrypt==4.0.1
+    # via
+    #   -r ./requirements.txt
+    #   paramiko
 certifi==2022.9.24
     # via
     #   -r ./requirements.txt
     #   httpcore
     #   httpx
     #   requests
+cffi==1.15.1
+    # via
+    #   -r ./requirements.txt
+    #   cryptography
+    #   pynacl
 chardet==3.0.4
     # via
     #   -r ./requirements.txt
     #   requests
 charmed-kubeflow-chisme==0.0.5
     # via -r ./requirements.txt
+cryptography==38.0.4
+    # via
+    #   -r ./requirements.txt
+    #   paramiko
 deepdiff==6.2.1
     # via
     #   -r ./requirements.txt
@@ -59,6 +72,12 @@ jsonschema==3.2.0
     # via
     #   -r ./requirements.txt
     #   serialized-data-interface
+juju==2.8.4
+    # via -r ./requirements.txt
+jujubundlelib==0.5.7
+    # via
+    #   -r ./requirements.txt
+    #   theblues
 lightkube==0.11.0
     # via
     #   -r ./requirements.txt
@@ -67,10 +86,19 @@ lightkube-models==1.24.1.4
     # via
     #   -r ./requirements.txt
     #   lightkube
+macaroonbakery==1.3.1
+    # via
+    #   -r ./requirements.txt
+    #   juju
+    #   theblues
 markupsafe==2.1.1
     # via
     #   -r ./requirements.txt
     #   jinja2
+mypy-extensions==0.4.3
+    # via
+    #   -r ./requirements.txt
+    #   typing-inspect
 oci-image==1.0.0
     # via -r ./requirements.txt
 ops==1.5.4
@@ -84,10 +112,41 @@ ordered-set==4.1.0
     #   deepdiff
 packaging==21.3
     # via pytest
+paramiko==2.12.0
+    # via
+    #   -r ./requirements.txt
+    #   juju
 pluggy==1.0.0
     # via pytest
+protobuf==3.20.3
+    # via
+    #   -r ./requirements.txt
+    #   macaroonbakery
+pyasn1==0.4.8
+    # via
+    #   -r ./requirements.txt
+    #   juju
+pycparser==2.21
+    # via
+    #   -r ./requirements.txt
+    #   cffi
+pymacaroons==0.13.0
+    # via
+    #   -r ./requirements.txt
+    #   macaroonbakery
+pynacl==1.5.0
+    # via
+    #   -r ./requirements.txt
+    #   macaroonbakery
+    #   paramiko
+    #   pymacaroons
 pyparsing==3.0.9
     # via packaging
+pyrfc3339==1.1
+    # via
+    #   -r ./requirements.txt
+    #   juju
+    #   macaroonbakery
 pyrsistent==0.19.2
     # via
     #   -r ./requirements.txt
@@ -98,16 +157,24 @@ pytest==7.2.0
     #   pytest-asyncio
 pytest-asyncio==0.20.2
     # via -r ./requirements-unit.in
+pytz==2022.6
+    # via
+    #   -r ./requirements.txt
+    #   pyrfc3339
 pyyaml==5.4
     # via
     #   -r ./requirements.txt
+    #   juju
+    #   jujubundlelib
     #   lightkube
     #   ops
     #   serialized-data-interface
 requests==2.25.0
     # via
     #   -r ./requirements.txt
+    #   macaroonbakery
     #   serialized-data-interface
+    #   theblues
 rfc3986[idna2008]==1.5.0
     # via
     #   -r ./requirements.txt
@@ -126,18 +193,41 @@ six==1.16.0
     # via
     #   -r ./requirements.txt
     #   jsonschema
+    #   macaroonbakery
+    #   paramiko
+    #   pymacaroons
 sniffio==1.3.0
     # via
     #   -r ./requirements.txt
     #   anyio
     #   httpcore
     #   httpx
+theblues==0.5.2
+    # via
+    #   -r ./requirements.txt
+    #   juju
 tomli==2.0.1
     # via pytest
+toposort==1.7
+    # via
+    #   -r ./requirements.txt
+    #   juju
+typing-extensions==4.4.0
+    # via
+    #   -r ./requirements.txt
+    #   typing-inspect
+typing-inspect==0.8.0
+    # via
+    #   -r ./requirements.txt
+    #   juju
 urllib3==1.26.13
     # via
     #   -r ./requirements.txt
     #   requests
+websockets==7.0
+    # via
+    #   -r ./requirements.txt
+    #   juju
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

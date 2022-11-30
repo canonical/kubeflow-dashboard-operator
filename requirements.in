@@ -3,7 +3,9 @@
 
 charmed-kubeflow-chisme
 jinja2
+juju
 lightkube
 ops
 oci-image
 serialized-data-interface
+websockets<8.0

@@ -2,4 +2,5 @@ juju
 pytest-operator
 selenium
 selenium-wire
+websockets<8.0
 -r requirements.txt
