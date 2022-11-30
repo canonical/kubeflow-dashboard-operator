@@ -12,13 +12,17 @@
     },
     "packageRules": [
         {
+            "groupName": "testing deps",
             "matchPackagePatterns": [
                 "^black$",
                 "flake8",
                 "pep8-naming",
                 "isort",
                 "codespell",
-                "pytest"
+                "pytest",
+                "pytest-asyncio",
+                "selenium",
+                "selenium-wire"
             ],
             "automerge": true
         }
