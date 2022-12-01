@@ -1,25 +1,21 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 from pathlib import Path
 from time import sleep
-
-import json
 from typing import Tuple
+
 import pytest
 import pytest_asyncio
 import yaml
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
+from pytest_operator.plugin import OpsTest
 from selenium import webdriver
-from selenium.common.exceptions import (
-    JavascriptException,
-    WebDriverException,
-)
+from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from pytest_operator.plugin import OpsTest
-
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -87,9 +83,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
-    await ops_test.model.deploy(
-        my_charm, resources={"oci-image": image_path}, trust=True
-    )
+    await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
 
     await ops_test.model.wait_for_idle(
         [CHARM_NAME],

@@ -8,4 +8,3 @@ lightkube
 ops
 oci-image
 serialized-data-interface
-websockets<8.0

@@ -4,29 +4,19 @@
 
 import json
 import logging
-
 from pathlib import Path
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
-from lightkube.models.core_v1 import ServicePort
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
+from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import (
-    ActiveStatus,
-    BlockedStatus,
-    MaintenanceStatus,
-    WaitingStatus,
-)
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
-from serialized_data_interface import (
-    NoCompatibleVersions,
-    NoVersionsListed,
-    get_interfaces,
-)
+from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
 BASE_SIDEBAR = json.loads(Path("src/config/sidebar_config.json").read_text())
 K8S_RESOURCE_FILES = [
@@ -179,9 +169,7 @@ class KubeflowDashboardOperator(CharmBase):
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
             self.container.add_layer(self._container_name, new_layer, combine=True)
             try:
-                self.logger.info(
-                    "Pebble plan updated with new configuration, replaning"
-                )
+                self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
             except ChangeError:
                 raise CheckFailed("Failed to replan", BlockedStatus)
@@ -207,12 +195,8 @@ class KubeflowDashboardOperator(CharmBase):
             )
 
     def _check_kf_profiles(self, interfaces):
-        if not (
-            (kf_profiles := interfaces["kubeflow-profiles"]) and kf_profiles.get_data()
-        ):
-            raise CheckFailed(
-                "Waiting for kubeflow-profiles relation data", WaitingStatus
-            )
+        if not ((kf_profiles := interfaces["kubeflow-profiles"]) and kf_profiles.get_data()):
+            raise CheckFailed("Waiting for kubeflow-profiles relation data", WaitingStatus)
 
         return kf_profiles
 
@@ -251,9 +235,7 @@ class KubeflowDashboardOperator(CharmBase):
         k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
         configmap_manifest = self.configmap_handler.render_manifests()
         try:
-            delete_many(
-                self.k8s_resource_handler.lightkube_client, k8s_resources_manifests
-            )
+            delete_many(self.k8s_resource_handler.lightkube_client, k8s_resources_manifests)
             delete_many(self.configmap_handler.lightkube_client, configmap_manifest)
         except ApiError as e:
             self.logger.warning(f"Failed to delete resources, with error: {e}")
