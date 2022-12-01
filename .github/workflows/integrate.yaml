@@ -94,6 +94,13 @@ jobs:
       - name: Run integration tests
         run: /opt/hostedtoolcache/Python/3.10.5/x64/bin/tox -vve integration -- --model testing
 
+      - name: Setup tmate session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
+        with:
+          limit-access-to-actor: true
+
       - name: Get all
         run: kubectl get all -A
         if: failure()
