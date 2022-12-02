@@ -2,8 +2,6 @@
 # See LICENSE file for licensing details.
 
 charmed-kubeflow-chisme
-jinja2
-juju
 lightkube
 ops
 oci-image
