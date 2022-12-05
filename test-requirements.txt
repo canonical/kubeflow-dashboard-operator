@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 black
-flake8
-flake8-copyright<0.3
+flake8<6
+flake8-copyright
 pytest
 selenium==3.141.0
