@@ -1,19 +1,18 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-from unittest.mock import patch, MagicMock
-from unittest import mock
-
 import json
+from pathlib import Path
+from unittest import mock
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-
 from lightkube import ApiError
-from ops.model import BlockedStatus, WaitingStatus, ActiveStatus
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
-from pathlib import Path
-from charm import KubeflowDashboardOperator
 
+from charm import KubeflowDashboardOperator
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -105,21 +104,15 @@ class TestCharm:
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_failure(self, harness: Harness):
         harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status == WaitingStatus(
-            "Waiting for leadership"
-        )
+        assert harness.charm.model.unit.status == WaitingStatus("Waiting for leadership")
         harness.set_leader(True)
-        assert harness.charm.model.unit.status != WaitingStatus(
-            "Waiting for leadership"
-        )
+        assert harness.charm.model.unit.status != WaitingStatus("Waiting for leadership")
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_success(self, harness: Harness):
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status != WaitingStatus(
-            "Waiting for leadership"
-        )
+        assert harness.charm.model.unit.status != WaitingStatus("Waiting for leadership")
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_model_name_failure(self):
@@ -167,14 +160,10 @@ class TestCharm:
         container: MagicMock,
         harness_with_profiles: Harness,
     ):
-        container.replan.side_effect = _FakeChangeError(
-            "Fake problem during layer update", None
-        )
+        container.replan.side_effect = _FakeChangeError("Fake problem during layer update", None)
         harness_with_profiles.container_pebble_ready(CHARM_NAME)
         harness_with_profiles.begin_with_initial_hooks()
-        assert harness_with_profiles.charm.model.unit.status == BlockedStatus(
-            "Failed to replan"
-        )
+        assert harness_with_profiles.charm.model.unit.status == BlockedStatus("Failed to replan")
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.configmap_handler")
@@ -224,9 +213,7 @@ class TestCharm:
         configmap_handler.apply.assert_called_once()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-        assert (
-            json.loads(harness_with_profiles.charm._context["links"]) == expected_links
-        )
+        assert json.loads(harness_with_profiles.charm._context["links"]) == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
