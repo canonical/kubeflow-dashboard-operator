@@ -11,7 +11,7 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: docker.io/kubeflownotebookswg/centraldashboard:v1.6.1
+    upstream-source: docker.io/kubeflownotebookswg/centraldashboard:v1.7.0-rc.0
 requires:
   ingress:
     interface: ingress
