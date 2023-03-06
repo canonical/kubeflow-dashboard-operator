@@ -57,8 +57,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Setup operator environment
-        # TODO: Unpin this when https://github.com/charmed-kubernetes/actions-operator/pull/46 is merged
-        uses: claudiubelu/actions-operator@18ebf92ae3043bd3dd15238e5d9b662d7ba08daf
+        uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
             channel: 1.24/stable
@@ -67,12 +66,6 @@ jobs:
           #       In particular, these tests failed deploying the prometheus-k8s charm where it gets an error in
           #       the "metrics-endpoint-relation-changed" hook.
             bootstrap-options: --agent-version="2.9.34"
-
-
-      # TODO: Remove once the actions-operator does this automatically
-      - name: Configure kubectl
-        run: |
-          sg microk8s -c "microk8s config > ~/.kube/config"
       
       - name: Configure microk8s
         run: |
