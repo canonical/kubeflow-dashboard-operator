@@ -1,1 +1,94 @@
-{"menuLinks": [{"type": "item","link": "/katib/","text": "Experiments (AutoML)","icon": "kubeflow:katib"},{"type": "item","link": "/tensorboards/","text": "Tensorboards","icon": "assessment"},{"type": "item","link": "/jupyter/","text": "Notebooks","icon": "book"},{"type": "item","text": "Experiments (KFP)","link": "/pipeline/#/experiments","icon": "done-all"},{"type": "item","link": "/pipeline/#/pipelines","text": "Pipelines","icon": "kubeflow:pipeline-centered"},{"type": "item","link": "/pipeline/#/runs","text": "Runs","icon": "maps:directions-run"},{"type": "item","link": "/pipeline/#/recurringruns","text": "Recurring Runs","icon": "device:access-alarm"},{"type": "item","link": "/volumes/","text": "Volumes","icon": "device:storage"}],"externalLinks": [],"quickLinks": [{"text": "Upload a pipeline","desc": "Pipelines","link": "/pipeline/"},{"text": "View all pipeline runs","desc": "Pipelines","link": "/pipeline/#/runs"},{"text": "Create a new Notebook server","desc": "Notebook Servers","link": "/jupyter/new?namespace=kubeflow"},{"text": "View Katib Experiments","desc": "Katib","link": "/katib/"}],"documentationItems": [{"text": "Kubeflow Basics","desc": "Learn how to get started with Kubeflow","link": "https://charmed-kubeflow.io/docs/kubeflow-basics"},{"text": "Microk8s for Kubeflow","desc": "Quickly get Kubeflow running locally on native hypervisors","link": "https://microk8s.io/docs/addon-kubeflow"},{"text": "Requirements for Kubeflow","desc": "Get more detailed information about using Kubeflow and its components","link": "https://www.kubeflow.org/docs/started/requirements/"}]}
+{
+    "menuLinks": [
+        {
+            "type": "item",
+            "link": "/jupyter/",
+            "text": "Notebooks",
+            "icon": "book"
+        },
+        {
+            "type": "item",
+            "link": "/katib/",
+            "text": "Experiments (AutoML)",
+            "icon": "kubeflow:katib"
+        },
+        {
+            "type": "item",
+            "text": "Experiments (KFP)",
+            "link": "/pipeline/#/experiments",
+            "icon": "done-all"
+        },
+        {
+            "type": "item",
+            "link": "/pipeline/#/pipelines",
+            "text": "Pipelines",
+            "icon": "kubeflow:pipeline-centered"
+        },
+        {
+            "type": "item",
+            "link": "/pipeline/#/runs",
+            "text": "Runs",
+            "icon": "maps:directions-run"
+        },
+        {
+            "type": "item",
+            "link": "/pipeline/#/recurringruns",
+            "text": "Recurring Runs",
+            "icon": "device:access-alarm"
+        },
+        {
+            "type": "item",
+            "link": "/volumes/",
+            "text": "Volumes",
+            "icon": "device:storage"
+        },
+        {
+            "type": "item",
+            "link": "/tensorboards/",
+            "text": "Tensorboards",
+            "icon": "assessment"
+        }
+    ],
+    "externalLinks": [
+
+    ],
+    "quickLinks": [
+        {
+            "text": "Upload a pipeline",
+            "desc": "Pipelines",
+            "link": "/pipeline/"
+        },
+        {
+            "text": "View all pipeline runs",
+            "desc": "Pipelines",
+            "link": "/pipeline/#/runs"
+        },
+        {
+            "text": "Create a new Notebook server",
+            "desc": "Notebook Servers",
+            "link": "/jupyter/new?namespace=kubeflow"
+        },
+        {
+            "text": "View Katib Experiments",
+            "desc": "Katib",
+            "link": "/katib/"
+        }
+    ],
+    "documentationItems": [
+        {
+            "text": "Kubeflow Basics",
+            "desc": "Learn how to get started with Kubeflow",
+            "link": "https://charmed-kubeflow.io/docs/kubeflow-basics"
+        },
+        {
+            "text": "Microk8s for Kubeflow",
+            "desc": "Quickly get Kubeflow running locally on native hypervisors",
+            "link": "https://microk8s.io/docs/addon-kubeflow"
+        },
+        {
+            "text": "Requirements for Kubeflow",
+            "desc": "Get more detailed information about using Kubeflow and its components",
+            "link": "https://www.kubeflow.org/docs/started/requirements/"
+        }
+    ]
+}
