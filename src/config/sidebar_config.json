@@ -78,12 +78,12 @@
         {
             "text": "Kubeflow Basics",
             "desc": "Learn how to get started with Kubeflow",
-            "link": "https://charmed-kubeflow.io/docs/kubeflow-basics"
+            "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow"
         },
         {
             "text": "Microk8s for Kubeflow",
             "desc": "Quickly get Kubeflow running locally on native hypervisors",
-            "link": "https://microk8s.io/docs/addon-kubeflow"
+            "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-"
         },
         {
             "text": "Requirements for Kubeflow",
