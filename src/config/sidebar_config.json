@@ -78,7 +78,7 @@
         {
             "text": "Getting started with Charmed Kubeflow",
             "desc": "Learn how to get started with Kubeflow",
-            "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow"
+            "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow"
         },
         {
             "text": "Microk8s for Kubeflow",
