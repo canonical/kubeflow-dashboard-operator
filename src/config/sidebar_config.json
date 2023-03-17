@@ -76,7 +76,7 @@
     ],
     "documentationItems": [
         {
-            "text": "Charmed Kubeflow Basics",
+            "text": "Getting started with Charmed Kubeflow",
             "desc": "Learn how to get started with Kubeflow",
             "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow"
         },
