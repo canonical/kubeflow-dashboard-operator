@@ -159,7 +159,7 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
     # Ensure that doc links are set up properly
     links = [
-        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow",
+        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow"
         "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-",  # noqa: E501
         "https://www.kubeflow.org/docs/started/requirements/",
     ]
