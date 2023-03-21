@@ -3,6 +3,5 @@
 
 charmed-kubeflow-chisme
 lightkube
-ops
-oci-image
+ops<2
 serialized-data-interface
