@@ -152,7 +152,7 @@ mypy-extensions==1.0.0
     # via typing-inspect
 oauthlib==3.2.2
     # via requests-oauthlib
-ops==2.1.1
+ops==1.5.4
     # via
     #   -r ./requirements.txt
     #   charmed-kubeflow-chisme
@@ -326,10 +326,7 @@ urllib3[socks]==1.26.15
 wcwidth==0.2.6
     # via prompt-toolkit
 websocket-client==1.5.1
-    # via
-    #   -r ./requirements.txt
-    #   kubernetes
-    #   ops
+    # via kubernetes
 websockets==7.0
     # via juju
 wsproto==1.2.0
