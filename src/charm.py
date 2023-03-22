@@ -6,6 +6,7 @@ import json
 import logging
 from pathlib import Path
 
+from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
@@ -171,8 +172,8 @@ class KubeflowDashboardOperator(CharmBase):
             try:
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
-            except ChangeError:
-                raise CheckFailed("Failed to replan", BlockedStatus)
+            except ChangeError as e:
+                raise GenericCharmRuntimeError("Failed to replan") from e
 
     def _get_interfaces(self):
         try:
@@ -205,8 +206,8 @@ class KubeflowDashboardOperator(CharmBase):
             self.unit.status = MaintenanceStatus("Creating k8s resources")
             self.k8s_resource_handler.apply()
             self.configmap_handler.apply()
-        except ApiError:
-            raise CheckFailed("kubernetes resource creation failed", BlockedStatus)
+        except ApiError as e:
+            raise GenericCharmRuntimeError("Failed to create K8S resources") from e
         self.model.unit.status = ActiveStatus()
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
