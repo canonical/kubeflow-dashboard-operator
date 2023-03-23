@@ -139,6 +139,7 @@ class KubeflowDashboardOperator(CharmBase):
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
                         "REGISTRATION_FLOW": self._registration_flow,
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
+                        "LOGOUT_URL": "/authservice/logout",
                     },
                 }
             },
