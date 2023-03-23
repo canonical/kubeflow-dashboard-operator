@@ -197,7 +197,12 @@ class KubeflowDashboardOperator(CharmBase):
             )
 
     def _check_kf_profiles(self, interfaces):
-        if not ((kf_profiles := interfaces["kubeflow-profiles"]) and kf_profiles.get_data()):
+        kf_profiles = interfaces["kubeflow-profiles"]
+
+        if not kf_profiles:
+            raise CheckFailed("Relation to kubeflow-profiles required", BlockedStatus)
+
+        if not kf_profiles.get_data():
             raise CheckFailed("Waiting for kubeflow-profiles relation data", WaitingStatus)
 
         return kf_profiles

@@ -87,14 +87,13 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(
         [CHARM_NAME],
-        raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "waiting"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
     assert (
         ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
-        == "Waiting for kubeflow-profiles relation data"
+        == "Relation to kubeflow-profiles required"
     )
 
 
@@ -106,7 +105,6 @@ async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
-        raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )

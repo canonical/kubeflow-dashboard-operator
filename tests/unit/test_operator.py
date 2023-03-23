@@ -139,8 +139,8 @@ class TestCharm:
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
 
-        assert harness.charm.model.unit.status == WaitingStatus(
-            "Waiting for kubeflow-profiles relation data"
+        assert harness.charm.model.unit.status == BlockedStatus(
+            "Relation to kubeflow-profiles required"
         )
 
     @patch("charm.KubernetesResourceHandler")
