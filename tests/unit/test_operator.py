@@ -140,7 +140,7 @@ class TestCharm:
         harness.begin_with_initial_hooks()
 
         assert harness.charm.model.unit.status == BlockedStatus(
-            "Relation to kubeflow-profiles required"
+            "Add required relation to kubeflow-profiles"
         )
 
     @patch("charm.KubernetesResourceHandler")
