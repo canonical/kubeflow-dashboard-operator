@@ -93,7 +93,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
     assert (
         ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
-        == "Relation to kubeflow-profiles required"
+        == "Add required relation to kubeflow-profiles"
     )
 
 
