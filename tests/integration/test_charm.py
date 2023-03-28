@@ -87,14 +87,13 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(
         [CHARM_NAME],
-        raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "waiting"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
     assert (
         ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
-        == "Waiting for kubeflow-profiles relation data"
+        == "Add required relation to kubeflow-profiles"
     )
 
 
@@ -106,7 +105,6 @@ async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
-        raise_on_blocked=True,
         raise_on_error=True,
         timeout=300,
     )
@@ -159,8 +157,8 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
 
     # Ensure that doc links are set up properly
     links = [
-        "https://charmed-kubeflow.io/docs/kubeflow-basics",
-        "https://microk8s.io/docs/addon-kubeflow",
+        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow",  # noqa: E501
+        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-",  # noqa: E501
         "https://www.kubeflow.org/docs/started/requirements/",
     ]
 

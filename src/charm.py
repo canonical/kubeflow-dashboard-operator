@@ -6,6 +6,7 @@ import json
 import logging
 from pathlib import Path
 
+from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
@@ -138,6 +139,7 @@ class KubeflowDashboardOperator(CharmBase):
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
                         "REGISTRATION_FLOW": self._registration_flow,
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
+                        "LOGOUT_URL": "/authservice/logout",
                     },
                 }
             },
@@ -171,8 +173,8 @@ class KubeflowDashboardOperator(CharmBase):
             try:
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
-            except ChangeError:
-                raise CheckFailed("Failed to replan", BlockedStatus)
+            except ChangeError as e:
+                raise GenericCharmRuntimeError("Failed to replan") from e
 
     def _get_interfaces(self):
         try:
@@ -195,7 +197,12 @@ class KubeflowDashboardOperator(CharmBase):
             )
 
     def _check_kf_profiles(self, interfaces):
-        if not ((kf_profiles := interfaces["kubeflow-profiles"]) and kf_profiles.get_data()):
+        kf_profiles = interfaces["kubeflow-profiles"]
+
+        if not kf_profiles:
+            raise CheckFailed("Add required relation to kubeflow-profiles", BlockedStatus)
+
+        if not kf_profiles.get_data():
             raise CheckFailed("Waiting for kubeflow-profiles relation data", WaitingStatus)
 
         return kf_profiles
@@ -205,8 +212,8 @@ class KubeflowDashboardOperator(CharmBase):
             self.unit.status = MaintenanceStatus("Creating k8s resources")
             self.k8s_resource_handler.apply()
             self.configmap_handler.apply()
-        except ApiError:
-            raise CheckFailed("kubernetes resource creation failed", BlockedStatus)
+        except ApiError as e:
+            raise GenericCharmRuntimeError("Failed to create K8S resources") from e
         self.model.unit.status = ActiveStatus()
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):

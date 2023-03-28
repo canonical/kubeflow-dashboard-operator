@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
+from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from lightkube import ApiError
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
@@ -138,8 +139,8 @@ class TestCharm:
         harness.set_leader(True)
         harness.begin_with_initial_hooks()
 
-        assert harness.charm.model.unit.status == WaitingStatus(
-            "Waiting for kubeflow-profiles relation data"
+        assert harness.charm.model.unit.status == BlockedStatus(
+            "Add required relation to kubeflow-profiles"
         )
 
     @patch("charm.KubernetesResourceHandler")
@@ -162,8 +163,8 @@ class TestCharm:
     ):
         container.replan.side_effect = _FakeChangeError("Fake problem during layer update", None)
         harness_with_profiles.container_pebble_ready(CHARM_NAME)
-        harness_with_profiles.begin_with_initial_hooks()
-        assert harness_with_profiles.charm.model.unit.status == BlockedStatus("Failed to replan")
+        with pytest.raises(GenericCharmRuntimeError):
+            harness_with_profiles.begin_with_initial_hooks()
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.configmap_handler")
