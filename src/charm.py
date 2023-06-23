@@ -55,13 +55,6 @@ class KubeflowDashboardOperator(CharmBase):
         self._configmap_name = self.model.config["dashboard-configmap"]
         self._port = self.model.config["port"]
         self._registration_flow = self.model.config["registration-flow"]
-        self._context = {
-            "app_name": self._name,
-            "namespace": self._namespace,
-            "configmap_name": self._configmap_name,
-            "links": json.dumps(BASE_SIDEBAR),
-            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
-        }
         self._k8s_resource_handler = None
         self._configmap_handler = None
         port = ServicePort(int(self._port), name=f"{self.app.name}")
@@ -89,6 +82,16 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def container(self):
         return self._container
+
+    @property
+    def _context(self):
+        return {
+            "app_name": self._name,
+            "namespace": self._namespace,
+            "configmap_name": self._configmap_name,
+            "links": json.dumps(BASE_SIDEBAR),
+            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
+        }
 
     @property
     def k8s_resource_handler(self):
