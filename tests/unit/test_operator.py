@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
+from dataclasses import asdict
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -13,7 +14,8 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 
-from charm import KubeflowDashboardOperator
+from charm import KubeflowDashboardOperator, SIDEBAR_RELATION_NAME
+from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem, SIDEBAR_ITEMS_FIELD
 
 BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -28,14 +30,7 @@ RELATION_DATA = [
     }
 ]
 
-DEFAULT_CONTEXT = {
-    "app_name": "kubeflow-dashboard",
-    "namespace": "kubeflow",
-    "configmap_name": "centraldashboard-config",
-    "profilename": "test-profile",
-    "links": BASE_SIDEBAR,
-    "settings": "",
-}
+
 DEFAULT_RESOURCE_FILES = [
     "profile_crds.yaml.j2",
     "auth_manifests.yaml.j2",
@@ -207,14 +202,15 @@ class TestCharm:
         configmap_handler: MagicMock,
         harness_with_profiles: Harness,
     ):
-        expected_links = json.loads(BASE_SIDEBAR)
+        expected_links = []
         harness_with_profiles.begin()
         harness_with_profiles.charm.on.install.emit()
         k8s_resource_handler.apply.assert_called()
         configmap_handler.apply.assert_called_once()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-        assert json.loads(harness_with_profiles.charm._context["links"]) == expected_links
+        actual_links = json.loads(harness_with_profiles.charm._context["links"])
+        assert actual_links == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
@@ -248,3 +244,97 @@ class TestCharm:
         harness_with_profiles.begin()
         with pytest.raises(ApiError):
             harness_with_profiles.charm.on.remove.emit()
+
+
+class TestSidebarRelation:
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_context_with_sidebar_relations_no_links(
+            self,
+            harness_with_profiles: Harness,
+    ):
+        expected_links = []
+        harness_with_profiles.begin()
+        actual_links = json.loads(harness_with_profiles.charm._context["links"])
+        assert actual_links == expected_links
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.KubeflowDashboardOperator.configmap_handler")
+    @patch("charm.delete_many")
+    def test_context_with_adding_and_removing_sidebar_relations(
+            self,
+            update_layer: MagicMock,
+            k8s_resource_handler: MagicMock,
+            configmap_handler: MagicMock,
+            harness_with_profiles: Harness,
+    ):
+        """e2e test of the sidebar relation, checking k8s context for added/removed relations."""
+        harness_with_profiles.begin()
+
+        relations = [add_sidebar_relation(harness_with_profiles, other_app_name=f"other{i}") for i in range(3)]
+
+        # Related apps, but no links
+        expected_items = []
+        actual_items = json.loads(harness_with_profiles.charm._context["links"])
+        assert actual_items == expected_items
+
+        # Add links to relations[0]
+        relation_data = add_data_to_sidebar_relation(
+            harness_with_profiles,
+            relations[0]
+        )
+        relations[0].update(relation_data)
+
+        actual_items = [SidebarItem(**item) for item in json.loads(harness_with_profiles.charm._context["links"])]
+        assert actual_items == relations[0]['sidebar_items']
+
+        # Add some links to relation 2, skipping relation1
+        relation_data = add_data_to_sidebar_relation(
+            harness_with_profiles,
+            relations[2]
+        )
+        relations[2].update(relation_data)
+        actual_items = [SidebarItem(**item) for item in json.loads(harness_with_profiles.charm._context["links"])]
+        assert actual_items == relations[0]['sidebar_items'] + relations[2]['sidebar_items']
+
+        # Remove relation1, which should do nothing to the sidebar items
+        harness_with_profiles.remove_relation(relation_id=relations[1]['rel_id'])
+        actual_items = [SidebarItem(**item) for item in json.loads(harness_with_profiles.charm._context["links"])]
+        assert actual_items == relations[0]['sidebar_items'] + relations[2]['sidebar_items']
+
+        # Remove relation0, which should leave only the second set of sidebar items
+        harness_with_profiles.remove_relation(relation_id=relations[0]['rel_id'])
+        actual_items = [SidebarItem(**item) for item in json.loads(harness_with_profiles.charm._context["links"])]
+        assert actual_items == relations[2]['sidebar_items']
+
+
+def add_sidebar_relation(harness: Harness, other_app_name: str):
+    rel_id = harness.add_relation(
+        SIDEBAR_RELATION_NAME,
+        remote_app=other_app_name
+    )
+    return {"rel_id": rel_id, "app_name": other_app_name}
+
+
+def add_data_to_sidebar_relation(harness, relation_metadata):
+    rel_id = relation_metadata['rel_id']
+    app_name = relation_metadata['app_name']
+    sidebar_items = [
+        SidebarItem(text=f"text-{rel_id}-{i}", link=f"link-{rel_id}-{i}", type=f"type-{rel_id}-{i}", icon=f"icon-{rel_id}-{i}")
+        for i in range(3)
+    ]
+    databag = {
+        SIDEBAR_ITEMS_FIELD: json.dumps(
+            [asdict(sidebar_item) for sidebar_item in sidebar_items]
+        )
+    }
+    harness.update_relation_data(
+        relation_id=rel_id,
+        app_or_unit=app_name,
+        key_values=databag
+    )
+
+    return {
+        'sidebar_items': sidebar_items,
+        'databag': databag,
+    }
