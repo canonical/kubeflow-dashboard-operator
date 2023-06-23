@@ -159,6 +159,9 @@ class KubeflowDashboardSidebarProvider(Object):
 
         return sidebar_items
 
+    def get_sidebar_items_as_json(self) -> str:
+        return sidebar_items_to_json(self.get_sidebar_items())
+
     def _on_relation_changed(self, event):
         """Handler for relation-changed event for this relation."""
         self.on.data_updated.emit(event.relation)

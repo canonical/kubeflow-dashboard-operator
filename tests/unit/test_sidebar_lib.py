@@ -112,6 +112,39 @@ class TestProvider:
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
 
+    def test_get_sidebar_items_as_json(self):
+        # Arrange
+        # Set up charm
+        other_app = "other"
+        harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
+
+        # Create data
+        expected_sidebar_items = [
+            SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+            for i in range(3)
+        ]
+        databag = {
+            SIDEBAR_ITEMS_FIELD: json.dumps(
+                [asdict(sidebar_item) for sidebar_item in expected_sidebar_items]
+            )
+        }
+        expected_sidebar_items_as_json = json.dumps([asdict(item) for item in expected_sidebar_items])
+
+        # Add data to relation
+        relation_id = harness.add_relation(RELATION_NAME, other_app)
+        harness.update_relation_data(
+            relation_id=relation_id, app_or_unit=other_app, key_values=databag
+        )
+
+        harness.begin()
+
+        # Act
+        # Get SidebarItems from relation data as json
+        actual_sidebar_items_as_json = harness.charm.sidebar_provider.get_sidebar_items_as_json()
+
+        # Assert
+        assert actual_sidebar_items_as_json == expected_sidebar_items_as_json
+
     def test_emit_data_updated(self):
         """Tests that the Provider library emits KubeflowDashboardSidebarDataUpdatedEvents."""
         # Arrange
