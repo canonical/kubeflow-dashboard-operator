@@ -92,6 +92,26 @@ class TestProvider:
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
 
+    def test_get_sidebar_items_from_empty_relation(self):
+        # Arrange
+        # Set up charm
+        other_app = "other"
+        harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
+
+        # Add empty relation
+        harness.add_relation(RELATION_NAME, other_app)
+
+        expected_sidebar_items = []
+
+        harness.begin()
+
+        # Act
+        # Get SidebarItems from relation data
+        actual_sidebar_items = harness.charm.sidebar_provider.get_sidebar_items()
+
+        # Assert
+        assert actual_sidebar_items == expected_sidebar_items
+
     def test_emit_data_updated(self):
         """Tests that the Provider library emits KubeflowDashboardSidebarDataUpdatedEvents."""
         # Arrange

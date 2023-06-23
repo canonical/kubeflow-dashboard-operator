@@ -153,7 +153,7 @@ class KubeflowDashboardSidebarProvider(Object):
         sidebar_relation = self.model.relations[self._relation_name]
         for relation in sidebar_relation:
             other_app = relation.app
-            json_data = relation.data[other_app][SIDEBAR_ITEMS_FIELD]
+            json_data = relation.data[other_app].get(SIDEBAR_ITEMS_FIELD, "{}")
             dict_data = json.loads(json_data)
             sidebar_items.extend([SidebarItem(**item) for item in dict_data])
 
