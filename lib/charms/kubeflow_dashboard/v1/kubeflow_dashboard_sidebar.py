@@ -155,7 +155,7 @@ class KubeflowDashboardSidebarProvider(Object):
             other_app = relation.app
             json_data = relation.data[other_app][SIDEBAR_ITEMS_FIELD]
             dict_data = json.loads(json_data)
-            sidebar_items = [SidebarItem(**item) for item in dict_data]
+            sidebar_items.extend([SidebarItem(**item) for item in dict_data])
 
         return sidebar_items
 
@@ -234,3 +234,9 @@ class KubeflowDashboardSidebarRequirer(Object):
             relation_data = relation.data[self._charm.app]
             sidebar_items_as_json = json.dumps([asdict(item) for item in self._sidebar_items])
             relation_data.update({SIDEBAR_ITEMS_FIELD: sidebar_items_as_json})
+
+
+def sidebar_items_to_json(sidebar_items: List[SidebarItem]) -> str:
+    return json.dumps(
+        [asdict(sidebar_item) for sidebar_item in sidebar_items]
+    )

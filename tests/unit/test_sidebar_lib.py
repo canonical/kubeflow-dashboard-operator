@@ -59,13 +59,13 @@ class TestProvider:
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Create data
-        expected_sidebar_items = [
+        expected_sidebar_items_per_relation = [
             SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
             for i in range(3)
         ]
         databag = {
             SIDEBAR_ITEMS_FIELD: json.dumps(
-                [asdict(sidebar_item) for sidebar_item in expected_sidebar_items]
+                [asdict(sidebar_item) for sidebar_item in expected_sidebar_items_per_relation]
             )
         }
 
@@ -74,6 +74,14 @@ class TestProvider:
         harness.update_relation_data(
             relation_id=relation_id, app_or_unit=other_app, key_values=databag
         )
+
+        # Add to a second relation so we simulate having two relations of data
+        relation_id = harness.add_relation(RELATION_NAME, other_app)
+        harness.update_relation_data(
+            relation_id=relation_id, app_or_unit=other_app, key_values=databag
+        )
+
+        expected_sidebar_items = expected_sidebar_items_per_relation * 2
 
         harness.begin()
 
