@@ -54,7 +54,7 @@ class SomeCharm(CharmBase):
     # ...
 ```
 """
-
+import os
 from dataclasses import dataclass, asdict
 import json
 import logging
@@ -147,20 +147,55 @@ class KubeflowDashboardSidebarProvider(Object):
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_relation_changed)
 
-    def get_sidebar_items(self) -> List[SidebarItem]:
-        """Returns a list of all SidebarItems from related Applications."""
+    def get_sidebar_items(self, omit_breaking_app: bool = True) -> List[SidebarItem]:
+        """Returns a list of all SidebarItems from related Applications.
+
+        Args:
+            omit_breaking_app: If True and this is called during a sidebar-relation-broken event,
+                               the remote app's data will be omitted.  For more context, see:
+                               https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+
+        Returns:
+            List of SidebarItems defining the dashboard sidebar for all related applications.
+        """
+        # If this is a relation-broken event, remove the departing app from the relation data if
+        # it exists.  See: https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+        if omit_breaking_app:
+            other_app_to_skip = get_name_of_breaking_app(relation_name=self._relation_name)
+        else:
+            other_app_to_skip = None
+
+        if other_app_to_skip:
+            logger.debug(
+                f"get_sidebar_items executed during a relation-broken event.  Return will"
+                f"exclude sidebar_items from other app named '{other_app_to_skip}'.  "
+            )
+
         sidebar_items = []
         sidebar_relation = self.model.relations[self._relation_name]
         for relation in sidebar_relation:
             other_app = relation.app
+            if other_app.name == other_app_to_skip:
+                # Skip this app because it is leaving a broken relation
+                continue
             json_data = relation.data[other_app].get(SIDEBAR_ITEMS_FIELD, "{}")
             dict_data = json.loads(json_data)
             sidebar_items.extend([SidebarItem(**item) for item in dict_data])
 
         return sidebar_items
 
-    def get_sidebar_items_as_json(self) -> str:
-        return sidebar_items_to_json(self.get_sidebar_items())
+    def get_sidebar_items_as_json(self, omit_breaking_app: bool = True) -> str:
+        """Returns a JSON string of all SidebarItems from related Applications.
+
+        Args:
+            omit_breaking_app: If True and this is called during a sidebar-relation-broken event,
+                               the remote app's data will be omitted.  For more context, see:
+                               https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+
+        Returns:
+            JSON string of all SidebarItems for all related applications, each as dicts.
+        """
+        return sidebar_items_to_json(self.get_sidebar_items(omit_breaking_app=omit_breaking_app))
 
     def _on_relation_changed(self, event):
         """Handler for relation-changed event for this relation."""
@@ -237,6 +272,26 @@ class KubeflowDashboardSidebarRequirer(Object):
             relation_data = relation.data[self._charm.app]
             sidebar_items_as_json = json.dumps([asdict(item) for item in self._sidebar_items])
             relation_data.update({SIDEBAR_ITEMS_FIELD: sidebar_items_as_json})
+
+
+def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
+    """Returns breaking app name if called during RELATION_NAME-relation-broken and the breaking app name is available.  # noqa
+
+    Else, returns None.
+
+    Relation type and app name are inferred from juju environment variables.
+    """
+    if not os.environ.get("JUJU_REMOTE_APP", None):
+        # No remote app is defined
+        return None
+    if not os.environ.get("JUJU_RELATION", None) == relation_name:
+        # Not this relation
+        return None
+    if not os.environ.get("JUJU_HOOK_NAME", None) == f"{relation_name}-relation-broken":
+        # Not the relation-broken event
+        return None
+
+    return os.environ.get("JUJU_REMOTE_APP", None)
 
 
 def sidebar_items_to_json(sidebar_items: List[SidebarItem]) -> str:
