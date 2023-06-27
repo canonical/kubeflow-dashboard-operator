@@ -20,7 +20,6 @@ from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
     SIDEBAR_ITEMS_FIELD,
 )
 
-BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
 RELATION_DATA = [
