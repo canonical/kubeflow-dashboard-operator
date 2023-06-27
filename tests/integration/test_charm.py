@@ -3,6 +3,7 @@
 
 import json
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 from time import sleep
 from typing import Tuple
@@ -17,6 +18,9 @@ from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+
+from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG
+from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
 from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -130,7 +134,7 @@ async def test_status(ops_test: OpsTest):
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents_no_relations(lightkube_client: Client):
+async def test_configmap_contents_no_relations_or_config(lightkube_client: Client):
     """Tests the contents of the dashboard sidebar link configmap when no relations are present."""
     expected_links = []
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
@@ -166,17 +170,65 @@ async def test_configmap_contents_with_relations(
         timeout=150,
     )
 
-    # Assert that the configmap has the expected links
+    await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
+
+
+async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
+    """Asserts that the dashboard configmap has exactly the links expected."""
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     sidebar_items = json.loads(configmap.data["links"])["menuLinks"]
     sidebar_item_text = [item["text"] for item in sidebar_items]
-
     # Order is not guaranteed, so check that each is included individually
     assert len(sidebar_items) == len(expected_sidebar_items)
     for item in expected_sidebar_items:
         # For some reason, comparing sidebar items did not work here.  Comparing sidebar item
         # names as an approximation.
         assert item.text in sidebar_item_text
+
+
+@pytest.mark.asyncio
+async def test_configmap_contents_with_relations(
+        ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+):
+    """Tests the contents of the dashboard sidebar link configmap when user-driven links added."""
+    # Arrange
+    # Add config and check if we get additional sidebar links
+    config_sidebar_items = [
+        SidebarItem(
+            text="1",
+            link="/1",
+            type="item",
+            icon="assessment",
+        ),
+        SidebarItem(
+            text="2",
+            link="/2",
+            type="item",
+            icon="assessment",
+        ),
+    ]
+
+    config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
+
+    expected_sidebar_items = [
+        *generate_sidebar_items("tester1"),
+        *generate_sidebar_items("tester2"),
+        *config_sidebar_items
+    ]
+
+    # Act
+    await ops_test.model.applications[CHARM_NAME].set_config({ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)})
+
+    # Wait for everything to settle
+    await ops_test.model.wait_for_idle(
+        raise_on_error=True,
+        raise_on_blocked=True,
+        status="active",
+        timeout=150,
+    )
+
+    # Assert
+    await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
 
 
 @pytest.mark.asyncio
