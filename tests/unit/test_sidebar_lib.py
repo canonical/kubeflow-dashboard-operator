@@ -35,6 +35,7 @@ REQUIRER_SIDEBAR_ITEMS = [
 
 class DummyProviderCharm(CharmBase):
     """Mock charm that is a sidebar Provider."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sidebar_provider = KubeflowDashboardSidebarProvider(
@@ -44,6 +45,7 @@ class DummyProviderCharm(CharmBase):
 
 class DummyRequirerCharm(CharmBase):
     """Mock charm that is a sidebar Requirer."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sidebar_requirer = KubeflowDashboardSidebarRequirer(
