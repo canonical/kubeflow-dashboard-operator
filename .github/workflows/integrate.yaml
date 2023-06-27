@@ -77,29 +77,14 @@ jobs:
         run: |
           sg microk8s -c "tox -e integration -- --model kubeflow"
 
-      - name: Get all
-        run: kubectl get all -A
-        if: failure()
-      
-      - name: Get configmaps
-        run: kubectl get cm -A
-        if: failure()
-
       - name: Get juju status
         run: juju status
         if: failure()
 
-      - name: Get kubeflow-profiles workload logs
-        run: kubectl logs --tail 100 -nkubeflow -ljuju-app=kubeflow-dashboard
-        if: failure()
-
-      - name: Get kubeflow-kfam workload logs
-        run: kubectl logs --tail 100 -nkubeflow -ljuju-app=kubeflow-dashboard
-        if: failure()
-
-      - name: Get operator logs
-        run: kubectl logs --tail 100 -nkubeflow -loperator.juju.is/name
-        if: failure()
+      - uses: canonical/kubeflow-ci/dump-charm-debug-artifacts@version
+        # always() if you want this to run on every run, regardless of failure.
+        # more details: https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions
+        if: always()
 
       - name: Upload selenium screenshots
         uses: actions/upload-artifact@v3
