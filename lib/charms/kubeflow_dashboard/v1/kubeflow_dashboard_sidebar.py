@@ -1,5 +1,5 @@
 """# KubeflowDashboardSidebar Library
-This library implements data transfer for the kubeflow-dashboard-sidebar
+This library implements data transfer for the kubeflow_dashboard_sidebar
 interface used by Kubeflow Dashboard to implement the sidebar relation.  This
 relation enables applications to request a link on the Kubeflow Dashboard
 sidebar dynamically.

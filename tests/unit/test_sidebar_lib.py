@@ -19,13 +19,13 @@ DUMMY_PROVIDER_METADATA = """
 name: dummy-provider
 provides:
   sidebar:
-    interface: kubeflow-dashboard-sidebar
+    interface: kubeflow_dashboard_sidebar
 """
 DUMMY_REQUIRER_METADATA = """
 name: dummy-requirer
 requires:
   sidebar:
-    interface: kubeflow-dashboard-sidebar
+    interface: kubeflow_dashboard_sidebar
 """
 REQUIRER_SIDEBAR_ITEMS = [
     SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")

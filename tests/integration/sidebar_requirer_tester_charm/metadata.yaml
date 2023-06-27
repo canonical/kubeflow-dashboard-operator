@@ -5,4 +5,4 @@ description: none
 summary: none
 requires:
   sidebar:
-    interface: kubeflow-dashboard-sidebar
+    interface: kubeflow_dashboard_sidebar

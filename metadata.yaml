@@ -14,7 +14,7 @@ resources:
     upstream-source: docker.io/kubeflownotebookswg/centraldashboard:v1.7.0
 provides:
   sidebar:
-    interface: kubeflow-dashboard-sidebar
+    interface: kubeflow_dashboard_sidebar
 requires:
   ingress:
     interface: ingress
