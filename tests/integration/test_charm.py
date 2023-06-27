@@ -131,6 +131,7 @@ async def test_status(ops_test: OpsTest):
 
 @pytest.mark.asyncio
 async def test_configmap_contents_no_relations(lightkube_client: Client):
+    """Tests the contents of the dashboard sidebar link configmap when no relations are present."""
     expected_links = []
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])["menuLinks"]
@@ -141,6 +142,7 @@ async def test_configmap_contents_no_relations(lightkube_client: Client):
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
 ):
+    """Tests the contents of the dashboard sidebar link configmap when relations are present."""
     tester1 = "kubeflow-dashboard-requirer-tester1"
     tester2 = "kubeflow-dashboard-requirer-tester2"
     charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")

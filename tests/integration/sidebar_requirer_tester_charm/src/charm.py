@@ -24,6 +24,7 @@ class SidebarRequirerMockCharm(CharmBase):
 
 
 def generate_sidebar_items(app_name: str) -> List[SidebarItem]:
+    """Returns a list of dummy SidebarItems with a specific structure."""
     return [
         SidebarItem(
             text=f"{app_name}-relative1",

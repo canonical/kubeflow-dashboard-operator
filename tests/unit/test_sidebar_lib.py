@@ -34,6 +34,7 @@ REQUIRER_SIDEBAR_ITEMS = [
 
 
 class DummyProviderCharm(CharmBase):
+    """Mock charm that is a sidebar Provider."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sidebar_provider = KubeflowDashboardSidebarProvider(
@@ -42,6 +43,7 @@ class DummyProviderCharm(CharmBase):
 
 
 class DummyRequirerCharm(CharmBase):
+    """Mock charm that is a sidebar Requirer."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sidebar_requirer = KubeflowDashboardSidebarRequirer(
@@ -53,6 +55,7 @@ class DummyRequirerCharm(CharmBase):
 
 class TestProvider:
     def test_get_sidebar_items(self):
+        """Tests that get_sidebar_items correctly returns information from the relation."""
         # Arrange
         # Set up charm
         other_app = "other"
@@ -93,6 +96,7 @@ class TestProvider:
         assert actual_sidebar_items == expected_sidebar_items
 
     def test_get_sidebar_items_from_empty_relation(self):
+        """Tests that get_sidebar_items correctly handles empty relations."""
         # Arrange
         # Set up charm
         other_app = "other"
@@ -113,6 +117,7 @@ class TestProvider:
         assert actual_sidebar_items == expected_sidebar_items
 
     def test_get_sidebar_items_as_json(self):
+        """Tests that get_sidebar_items_as_json returns relation data correctly."""
         # Arrange
         # Set up charm
         other_app = "other"
@@ -178,6 +183,8 @@ class TestProvider:
 
 class TestRequirer:
     def test_send_sidebar_on_leader_elected(self):
+        """Test that the sidebar Requirer correctly handles the leader elected event."""
+        # Arrange
         harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
         other_app = "provider"
         this_app = harness.model.app
@@ -200,13 +207,17 @@ class TestRequirer:
         assert actual_sidebar_items == REQUIRER_SIDEBAR_ITEMS
 
     def test_send_sidebar_on_relation_created(self):
+        """Test that the sidebar Requirer correctly handles the relation created event."""
+        # Arrange
         other_app = "provider"
         harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
         harness.set_leader(True)
         harness.begin()
 
+        # Act
         relation_id = harness.add_relation(relation_name=RELATION_NAME, remote_app=other_app)
 
+        # Assert
         actual_sidebar_items = get_sidebar_items_from_relation(
             harness, relation_id, harness.model.app
         )
@@ -235,6 +246,7 @@ class TestRequirer:
 
 
 def get_sidebar_items_from_relation(harness, relation_id, this_app) -> List[SidebarItem]:
+    """Returns the list of SidebarItems from a sidebar relation on a harness."""
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
     relation_data_as_dicts = json.loads(raw_relation_data[SIDEBAR_ITEMS_FIELD])
     actual_sidebar_items = [SidebarItem(**data) for data in relation_data_as_dicts]

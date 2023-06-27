@@ -81,6 +81,17 @@ SIDEBAR_ITEMS_FIELD = "sidebar_items"
 
 @dataclass
 class SidebarItem:
+    """Representation of a Kubeflow Dashboard sidebar entry.
+
+    See https://www.kubeflow.org/docs/components/central-dash/customizing-menu/ for more details.
+
+    Args:
+        text: The text shown in the sidebar
+        link: The relative link within the host (eg: /runs, not http://.../runs)
+        type: A type of sidebar entry (typically, "item")
+        icon: An icon for the link, from
+              https://kevingleason.me/Polymer-Todo/bower_components/iron-icons/demo/index.html
+    """
     text: str
     link: str
     type: str  # noqa: A003
@@ -98,6 +109,7 @@ class KubeflowDashboardidebarEvents(ObjectEvents):
 
 
 class KubeflowDashboardSidebarProvider(Object):
+    """Relation manager for the Provider side of the Kubeflow Dashboard Sidebar relation.."""
     on = KubeflowDashboardidebarEvents()
 
     def __init__(
@@ -106,8 +118,7 @@ class KubeflowDashboardSidebarProvider(Object):
         relation_name: str,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
-        """
-        Relation manager for the Provider side of the Kubeflow Dashboard Sidebar relation.
+        """Relation manager for the Provider side of the Kubeflow Dashboard Sidebar relation.
 
         This relation manager subscribes to:
         * on[relation_name].relation_changed
@@ -207,6 +218,7 @@ class KubeflowDashboardSidebarProvider(Object):
 
 
 class KubeflowDashboardSidebarRequirer(Object):
+    """Relation manager for the Requirer side of the Kubeflow Dashboard Sidebar relation."""
     def __init__(
         self,
         charm: CharmBase,
@@ -295,6 +307,7 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
 
 
 def sidebar_items_to_json(sidebar_items: List[SidebarItem]) -> str:
+    """Returns a list of SidebarItems as a JSON string."""
     return json.dumps(
         [asdict(sidebar_item) for sidebar_item in sidebar_items]
     )

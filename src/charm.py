@@ -94,7 +94,8 @@ class KubeflowDashboardOperator(CharmBase):
         return self._container
 
     @property
-    def _context(self):
+    def _context(self) -> dict:
+        """Returns the context used to create Kubernetes resources."""
         return {
             "app_name": self._name,
             "namespace": self._namespace,

@@ -254,6 +254,7 @@ class TestSidebarRelation:
         self,
         harness_with_profiles: Harness,
     ):
+        """Tests that context renders properly when no sidebar relations are present."""
         expected_links = []
         harness_with_profiles.begin()
         actual_links = json.loads(harness_with_profiles.charm._context["links"])
@@ -320,11 +321,13 @@ class TestSidebarRelation:
 
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
+    """Adds a sidebar relation to a harness."""
     rel_id = harness.add_relation(SIDEBAR_RELATION_NAME, remote_app=other_app_name)
     return {"rel_id": rel_id, "app_name": other_app_name}
 
 
-def add_data_to_sidebar_relation(harness, relation_metadata):
+def add_data_to_sidebar_relation(harness: Harness, relation_metadata: dict):
+    """Adds mock sidebar relation data to a relation on a harness."""
     rel_id = relation_metadata["rel_id"]
     app_name = relation_metadata["app_name"]
     sidebar_items = [
