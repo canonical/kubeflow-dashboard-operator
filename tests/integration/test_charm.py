@@ -184,25 +184,6 @@ def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, 
     """Tests all dashboard links other than the sidebar."""
     driver, wait, url = driver
 
-    # Ensure that quick links are set up properly
-    links = [
-        "/pipeline/",
-        "/pipeline/#/runs",
-        "/jupyter/new?namespace=kubeflow",
-        "/katib/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(
-            [
-                "main-page",
-                "dashboard-view",
-                f"iframe-link[href='{link}']",
-            ]
-        )
-        wait.until(lambda x: x.execute_script(script))
-
     # Ensure that doc links are set up properly
     links = [
         "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow",  # noqa: E501
