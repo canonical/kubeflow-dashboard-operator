@@ -2,8 +2,8 @@
 # See LICENSE file for licensing details.
 
 import json
-from pathlib import Path
 import shutil
+from pathlib import Path
 from time import sleep
 from typing import Tuple
 

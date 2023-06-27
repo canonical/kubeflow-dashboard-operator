@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 from typing import List
 
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus
-
 from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarRequirer,
     SidebarItem,
 )
+from ops.charm import CharmBase
+from ops.main import main
+from ops.model import ActiveStatus
 
 
 class SidebarRequirerMockCharm(CharmBase):

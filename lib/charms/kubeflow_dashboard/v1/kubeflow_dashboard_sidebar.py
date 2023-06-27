@@ -83,7 +83,7 @@ SIDEBAR_ITEMS_FIELD = "sidebar_items"
 class SidebarItem:
     text: str
     link: str
-    type: str
+    type: str  # noqa: A003
     icon: str
 
 

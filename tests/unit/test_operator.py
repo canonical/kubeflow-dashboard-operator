@@ -9,16 +9,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
+from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+    SIDEBAR_ITEMS_FIELD,
+    SidebarItem,
+)
 from lightkube import ApiError
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 
-from charm import KubeflowDashboardOperator, SIDEBAR_RELATION_NAME
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
-    SidebarItem,
-    SIDEBAR_ITEMS_FIELD,
-)
+from charm import SIDEBAR_RELATION_NAME, KubeflowDashboardOperator
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]

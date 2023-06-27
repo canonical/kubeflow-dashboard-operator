@@ -7,11 +7,11 @@ from ops.testing import Harness
 
 from lib.charms.harness_extensions.v0.capture_events import capture
 from lib.charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
-    KubeflowDashboardSidebarProvider,
-    SidebarItem,
-    KubeflowDashboardSidebarRequirer,
     SIDEBAR_ITEMS_FIELD,
     KubeflowDashboardSidebarDataUpdatedEvent,
+    KubeflowDashboardSidebarProvider,
+    KubeflowDashboardSidebarRequirer,
+    SidebarItem,
 )
 
 RELATION_NAME = "sidebar"
