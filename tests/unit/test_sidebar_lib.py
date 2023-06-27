@@ -163,14 +163,14 @@ class TestProvider:
 
         # Add data to relation
         # Assert that we emit a data_updated event
-        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent) as captured:
+        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent):
             harness.update_relation_data(
                 relation_id=relation_id, app_or_unit=other_app, key_values=databag
             )
 
         # Remove relation
         # Assert that we emit a data_updated event
-        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent) as captured:
+        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent) :
             harness.remove_relation(relation_id=relation_id)
 
 
