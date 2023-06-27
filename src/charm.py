@@ -21,6 +21,8 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
+from lib.charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import sidebar_items_to_json
+
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
@@ -96,11 +98,13 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def _context(self) -> dict:
         """Returns the context used to create Kubernetes resources."""
+        sidebar_items_as_json = self._get_sidebar_items_as_json()
+
         return {
             "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self._configmap_name,
-            "links": self.sidebar_provider.get_sidebar_items_as_json(),
+            "links": sidebar_items_as_json,
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
 
