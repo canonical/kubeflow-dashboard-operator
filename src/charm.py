@@ -4,7 +4,6 @@
 
 import json
 import logging
-from pathlib import Path
 
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler

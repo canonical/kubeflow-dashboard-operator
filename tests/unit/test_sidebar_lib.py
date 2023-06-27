@@ -128,7 +128,9 @@ class TestProvider:
                 [asdict(sidebar_item) for sidebar_item in expected_sidebar_items]
             )
         }
-        expected_sidebar_items_as_json = json.dumps([asdict(item) for item in expected_sidebar_items])
+        expected_sidebar_items_as_json = json.dumps(
+            [asdict(item) for item in expected_sidebar_items]
+        )
 
         # Add data to relation
         relation_id = harness.add_relation(RELATION_NAME, other_app)
@@ -170,7 +172,7 @@ class TestProvider:
 
         # Remove relation
         # Assert that we emit a data_updated event
-        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent) :
+        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent):
             harness.remove_relation(relation_id=relation_id)
 
 

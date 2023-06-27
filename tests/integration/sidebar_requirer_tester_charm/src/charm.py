@@ -5,7 +5,10 @@ from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus
 
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import KubeflowDashboardSidebarRequirer, SidebarItem
+from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+    KubeflowDashboardSidebarRequirer,
+    SidebarItem,
+)
 
 
 class SidebarRequirerMockCharm(CharmBase):
@@ -15,9 +18,7 @@ class SidebarRequirerMockCharm(CharmBase):
         super().__init__(*args, **kwargs)
         self.sidebar_items = generate_sidebar_items(self.app.name)
         self.sidebar_requirer = KubeflowDashboardSidebarRequirer(
-            charm=self,
-            relation_name="sidebar",
-            sidebar_items=self.sidebar_items
+            charm=self, relation_name="sidebar", sidebar_items=self.sidebar_items
         )
 
         self.model.unit.status = ActiveStatus()
@@ -38,6 +39,7 @@ def generate_sidebar_items(app_name: str) -> List[SidebarItem]:
             icon="assessment",
         ),
     ]
+
 
 if __name__ == "__main__":
     main(SidebarRequirerMockCharm)
