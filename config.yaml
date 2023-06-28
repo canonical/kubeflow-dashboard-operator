@@ -26,3 +26,9 @@ options:
     type: boolean
     default: true
     description: Whether to enable the registration flow on sign-in
+  sidebar-link-order:
+    type: string
+    default: '["Notebooks", "Experiments (AutoML)", "Experiments(KFP)", "Pipelines", "Runs", "Recurring Runs", "Volumes", "Tensorboards"]'
+    description: > 
+      YAML or JSON list of strings defining the order of the links in the dashboard sidebar.  The format is:
+      '["text of first link", "text of second link", "text of third link", ...]'.  See README.md for usage instructions.

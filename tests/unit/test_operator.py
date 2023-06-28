@@ -18,7 +18,13 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 
-from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG, SIDEBAR_RELATION_NAME, KubeflowDashboardOperator
+from charm import (
+    ADDITIONAL_SIDEBAR_LINKS_CONFIG,
+    SIDEBAR_LINKS_ORDER_CONFIG,
+    SIDEBAR_RELATION_NAME,
+    KubeflowDashboardOperator,
+)
+from src.charm import sort_sidebar_items
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -384,11 +390,11 @@ class TestSidebarLinks:
         assert harness.charm.logger.warning.call_count == 1
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_sidebar_relation_and_config_together(
+    def test_sidebar_relation_and_config_and_ordering_together(
         self,
         harness_with_profiles: Harness,
     ):
-        """Tests that combining relation- and user-driven sidebar items works as expected."""
+        """Tests that combining relation- and user-driven sidebar items, with ordering."""
         # Arrange
         harness = harness_with_profiles
 
@@ -399,10 +405,10 @@ class TestSidebarLinks:
         # Add config-based sidebar items
         config_sidebar_items = [
             SidebarItem(
-                text="1",
-                link="/1",
-                type="item",
-                icon="assessment",
+                text="text-user-1",
+                link="link-user-1",
+                type="item-user-1",
+                icon="icon-user-1",
             ),
         ]
         config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
@@ -422,6 +428,110 @@ class TestSidebarLinks:
         # Should include both relation- and config-based items, ordered relation then config
         assert actual_items == expected_sidebar_items
 
+        # Reorder the items via config
+        preferred_links = ["text-user-1", "text-relation1-2"]  # the user-config link,
+        harness.update_config({SIDEBAR_LINKS_ORDER_CONFIG: yaml.dump(preferred_links)})
+
+        expected_sidebar_items_ordered = [
+            config_sidebar_items[0],
+            relation_data["sidebar_items"][2],
+            relation_data["sidebar_items"][0],
+            relation_data["sidebar_items"][1],
+        ]
+        # Assert
+        # Should include both relation- and config-based items, ordered as set in config
+        actual_items = [
+            SidebarItem(**item) for item in json.loads(harness.charm._context["links"])
+        ]
+        assert actual_items == expected_sidebar_items_ordered
+
+    @pytest.mark.parametrize(
+        "sidebar_items, preferred_link_text, expected_result",
+        [
+            ([], ["some stuff"], []),  # Case where we have null input/output
+            # Case where we have empty reorder, so nothing should change
+            (
+                [
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+                [],
+                [
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+            ),
+            # Case where we have links that should be reordered
+            (
+                [
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+                ("2", "3"),
+                [
+                    SidebarItem(
+                        text="2",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+            ),
+        ],
+    )
+    def test_sort_sidebar_items(self, sidebar_items, preferred_link_text, expected_result):
+        """Tests that sort_sidebar_items works as expected."""
+        actual_sorted_items = sort_sidebar_items(sidebar_items, preferred_link_text)
+        assert actual_sorted_items == expected_result
+
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
     """Adds a sidebar relation to a harness."""
@@ -435,10 +545,10 @@ def add_data_to_sidebar_relation(harness: Harness, relation_metadata: dict):
     app_name = relation_metadata["app_name"]
     sidebar_items = [
         SidebarItem(
-            text=f"text-{rel_id}-{i}",
-            link=f"link-{rel_id}-{i}",
-            type=f"type-{rel_id}-{i}",
-            icon=f"icon-{rel_id}-{i}",
+            text=f"text-relation{rel_id}-{i}",
+            link=f"link-relation{rel_id}-{i}",
+            type=f"type-relation{rel_id}-{i}",
+            icon=f"icon-relation{rel_id}-{i}",
         )
         for i in range(3)
     ]

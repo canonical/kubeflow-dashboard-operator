@@ -13,7 +13,7 @@ from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarProvider,
     SidebarItem,
-    sidebar_items_to_json
+    sidebar_items_to_json,
 )
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
@@ -30,6 +30,7 @@ K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
+SIDEBAR_LINKS_ORDER_CONFIG = "sidebar-link-order"
 SIDEBAR_RELATION_NAME = "sidebar"
 
 
@@ -248,6 +249,10 @@ class KubeflowDashboardOperator(CharmBase):
         sidebar_items = []
         sidebar_items.extend(self.sidebar_provider.get_sidebar_items())
         sidebar_items.extend(self._get_sidebar_items_from_config())
+        sidebar_items = sort_sidebar_items(
+            sidebar_items, preferred_links=self._get_sidebar_items_order_from_config()
+        )
+
         return sidebar_items
 
     def _get_sidebar_items_as_json(self) -> str:
@@ -273,7 +278,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         try:
             user_sidebar_links = yaml.safe_load(sidebar_config)
-        except Exception as err:  # TODO: Make this the right error
+        except Exception as err:
             self.logger.warning(f"{error_message}  Got error: {err}")
             return []
 
@@ -284,6 +289,23 @@ class KubeflowDashboardOperator(CharmBase):
             return []
 
         return user_sidebar_links
+
+    def _get_sidebar_items_order_from_config(self) -> List[str]:
+        """Returns a list of strings defining the sidebar-link-order.
+
+        If there are errors in parsing the config, this returns an empty list and logs a warning.
+        """
+        error_message = (
+            f"Cannot parse user-defined sidebar link order from config "
+            f"`{SIDEBAR_LINKS_ORDER_CONFIG}` - ignoring this input and leaving links unordered."
+        )
+
+        sidebar_link_order = self.model.config[SIDEBAR_LINKS_ORDER_CONFIG]
+        try:
+            return yaml.safe_load(sidebar_link_order)
+        except Exception as err:
+            self.logger.warning(f"{error_message}  Got error: {err}")
+            return []
 
     def main(self, _) -> None:
         """Main entry point for the Charm."""
@@ -314,6 +336,35 @@ class KubeflowDashboardOperator(CharmBase):
             self.logger.warning(f"Failed to delete resources, with error: {e}")
             raise e
         self.unit.status = MaintenanceStatus("K8s resources removed")
+
+
+def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[str]):
+    """Sorts a list of SidebarItems by their link text, moving preferred links to the top.
+
+    The sorted order of the returned list will be:
+    * any links who have a text field that matches a string in `preferred_link_text`, in the order
+      specified in preferred_link_text
+    * any remaining links, in the order they appear in sidebar_items
+
+    For example, if:
+      sidebar_items=[SidebarItem(text="1"...), SidebarItem(text="2"...), SidebarItem(text="3"...)]
+      preferred_link_text=["2", "4"]
+    The return will be:
+      sidebar_items=[SidebarItem(text="2"...), SidebarItem(text="1"...), SidebarItem(text="3"...)]
+
+    Args:
+        sidebar_items: List of SidebarItems to sort
+        preferred_links: List of strings of SidebarItem text values
+
+    Returns:
+        Ordered list of SidebarItems
+    """
+    sidebar_items_lookup = {item.text: item for item in sidebar_items}
+    ordered_sidebar_items = [
+        sidebar_items_lookup[text] for text in preferred_links if text in sidebar_items_lookup
+    ]
+    remaining_sidebar_items = [item for item in sidebar_items if item.text not in preferred_links]
+    return ordered_sidebar_items + remaining_sidebar_items
 
 
 if __name__ == "__main__":
