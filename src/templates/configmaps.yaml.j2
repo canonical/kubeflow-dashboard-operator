@@ -1,7 +1,50 @@
 apiVersion: v1
 data:
   links: |-
-    {{ links }}
+    {
+      "menuLinks": {{ links }},
+      "externalLinks": [ ],
+      "quickLinks": [
+        {
+            "text": "Upload a pipeline",
+            "desc": "Pipelines",
+            "link": "/pipeline/"
+        },
+        {
+            "text": "View all pipeline runs",
+            "desc": "Pipelines",
+            "link": "/pipeline/#/runs"
+        },
+        {
+            "text": "Create a new Notebook server",
+            "desc": "Notebook Servers",
+            "link": "/jupyter/new?namespace=kubeflow"
+        },
+        {
+            "text": "View Katib Experiments",
+            "desc": "Katib",
+            "link": "/katib/"
+        }
+      ],
+      "documentationItems": [
+          {
+              "text": "Getting started with Charmed Kubeflow",
+              "desc": "Learn how to get started with Kubeflow",
+              "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow"
+          },
+          {
+              "text": "Microk8s for Kubeflow",
+              "desc": "Quickly get Kubeflow running locally on native hypervisors",
+              "link": "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-"
+          },
+          {
+              "text": "Requirements for Kubeflow",
+              "desc": "Get more detailed information about using Kubeflow and its components",
+              "link": "https://www.kubeflow.org/docs/started/requirements/"
+          }
+      ]
+    }
+
   settings: "{'DASHBOARD_FORCE_IFRAME': true}"
 kind: ConfigMap
 metadata:

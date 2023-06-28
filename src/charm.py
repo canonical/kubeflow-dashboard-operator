@@ -4,11 +4,13 @@
 
 import json
 import logging
-from pathlib import Path
 
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
+    KubeflowDashboardSidebarProvider,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -19,7 +21,6 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
-BASE_SIDEBAR = json.loads(Path("src/config/sidebar_config.json").read_text())
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
@@ -55,17 +56,12 @@ class KubeflowDashboardOperator(CharmBase):
         self._configmap_name = self.model.config["dashboard-configmap"]
         self._port = self.model.config["port"]
         self._registration_flow = self.model.config["registration-flow"]
-        self._context = {
-            "app_name": self._name,
-            "namespace": self._namespace,
-            "configmap_name": self._configmap_name,
-            "links": json.dumps(BASE_SIDEBAR),
-            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
-        }
         self._k8s_resource_handler = None
         self._configmap_handler = None
+
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(self, [port])
+
         for event in [
             self.on.install,
             self.on.leader_elected,
@@ -78,6 +74,13 @@ class KubeflowDashboardOperator(CharmBase):
             self.framework.observe(event, self.main)
         self.framework.observe(self.on.remove, self._on_remove)
 
+        # Handle the Kubeflow Dashboard sidebar relation
+        self.sidebar_provider = KubeflowDashboardSidebarProvider(
+            charm=self,
+            relation_name=SIDEBAR_RELATION_NAME,
+        )
+        self.framework.observe(self.sidebar_provider.on.data_updated, self.main)
+
     @property
     def profiles_service(self):
         return self._profiles_service
@@ -89,6 +92,17 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def container(self):
         return self._container
+
+    @property
+    def _context(self) -> dict:
+        """Returns the context used to create Kubernetes resources."""
+        return {
+            "app_name": self._name,
+            "namespace": self._namespace,
+            "configmap_name": self._configmap_name,
+            "links": self.sidebar_provider.get_sidebar_items_as_json(),
+            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
+        }
 
     @property
     def k8s_resource_handler(self):
