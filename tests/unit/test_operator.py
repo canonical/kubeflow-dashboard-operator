@@ -419,6 +419,9 @@ class TestSidebarLinks:
         expected_sidebar_items = relation_data["sidebar_items"] + config_sidebar_items
         harness.begin()
 
+        # Mock away lightkube-related tooling so config-changed hooks dont fail
+        harness.charm._deploy_k8s_resources = MagicMock()
+
         # Act
         actual_items = [
             SidebarItem(**item) for item in json.loads(harness.charm._context["links"])
