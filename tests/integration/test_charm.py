@@ -11,7 +11,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import SidebarItem
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -35,9 +35,9 @@ SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
 
 
 @pytest.fixture(scope="module")
-def copy_grafana_libraries_into_tester_charm() -> None:
+def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/kubeflow_dashboard/v1/kubeflow_dashboard_sidebar.py")
+    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_sidebar.py")
     Path(SIDEBAR_REQUIRER_TESTER_CHARM_PATH, lib.parent).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(lib.as_posix(), (SIDEBAR_REQUIRER_TESTER_CHARM_PATH / lib).as_posix())
 
