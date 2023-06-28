@@ -34,7 +34,6 @@ SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
 
-
 @pytest.fixture(scope="module")
 def copy_grafana_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
