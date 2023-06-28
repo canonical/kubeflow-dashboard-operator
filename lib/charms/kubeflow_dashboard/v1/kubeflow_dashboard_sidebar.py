@@ -16,13 +16,13 @@ To get started using the library, fetch the library with `charmcraft`.
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar
+charmcraft fetch-lib charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar
 ```
 
 Then in your charm, do:
 
 ```python
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarRequirer,
     SidebarItem,
 )
