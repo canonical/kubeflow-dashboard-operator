@@ -8,7 +8,7 @@ import logging
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarProvider,
 )
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch

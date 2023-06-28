@@ -16,13 +16,13 @@ To get started using the library, fetch the library with `charmcraft`.
 
 ```shell
 cd some-charm
-charmcraft fetch-lib charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar
+charmcraft fetch-lib charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar
 ```
 
 Then in your charm, do:
 
 ```python
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarRequirer,
     SidebarItem,
 )
@@ -69,11 +69,11 @@ logger = logging.getLogger(__name__)
 LIBID = "a5795a88ee31458f9bc3ae026a04b89f"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 
 SIDEBAR_ITEMS_FIELD = "sidebar_items"

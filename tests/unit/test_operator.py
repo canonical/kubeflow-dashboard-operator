@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     SIDEBAR_ITEMS_FIELD,
     SidebarItem,
 )
