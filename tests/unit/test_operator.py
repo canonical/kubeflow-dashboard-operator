@@ -249,6 +249,8 @@ class TestCharm:
 
 
 class TestSidebarRelation:
+    """Tests for the sidebar relation."""
+
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_context_with_sidebar_relations_no_links(
         self,
