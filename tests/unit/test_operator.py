@@ -506,7 +506,7 @@ class TestSidebarLinks:
                         icon="assessment",
                     ),
                 ],
-                ("2", ),
+                ("2",),
                 [
                     SidebarItem(
                         text="2",

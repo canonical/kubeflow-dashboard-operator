@@ -366,7 +366,11 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
 
     sidebar_items_names_alphabetical = sorted(sidebar_items_lookup.keys())
 
-    remaining_sidebar_items = [sidebar_items_lookup[name] for name in sidebar_items_names_alphabetical if name not in preferred_links]
+    remaining_sidebar_items = [
+        sidebar_items_lookup[name]
+        for name in sidebar_items_names_alphabetical
+        if name not in preferred_links
+    ]
     return ordered_sidebar_items + remaining_sidebar_items
 
 
