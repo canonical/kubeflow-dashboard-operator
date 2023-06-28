@@ -11,7 +11,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import SidebarItem
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from typing import List
 
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarRequirer,
     SidebarItem,
 )
