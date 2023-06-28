@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import json
+import shutil
 from pathlib import Path
 from time import sleep
 from typing import Tuple
@@ -16,12 +17,25 @@ from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
 PROFILES_CHARM_NAME = "kubeflow-profiles"
+
+SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
+    "tests/integration/sidebar_requirer_tester_charm"
+).absolute()
+
+
+@pytest.fixture(scope="module")
+def copy_libraries_into_tester_charm() -> None:
+    """Ensure that the tester charms use the current libraries."""
+    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_sidebar.py")
+    Path(SIDEBAR_REQUIRER_TESTER_CHARM_PATH, lib.parent).mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lib.as_posix(), (SIDEBAR_REQUIRER_TESTER_CHARM_PATH / lib).as_posix())
 
 
 @pytest_asyncio.fixture
@@ -116,44 +130,59 @@ async def test_status(ops_test: OpsTest):
 
 
 @pytest.mark.asyncio
-def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
+async def test_configmap_contents_no_relations(lightkube_client: Client):
+    """Tests the contents of the dashboard sidebar link configmap when no relations are present."""
+    expected_links = []
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    links = json.loads(configmap.data["links"])["menuLinks"]
+    assert links == expected_links
+
+
+@pytest.mark.asyncio
+async def test_configmap_contents_with_relations(
+    ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
+):
+    """Tests the contents of the dashboard sidebar link configmap when relations are present."""
+    tester1 = "kubeflow-dashboard-requirer-tester1"
+    tester2 = "kubeflow-dashboard-requirer-tester2"
+    charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")
+    await ops_test.model.deploy(charm, application_name=tester1)
+
+    await ops_test.model.deploy(charm, application_name=tester2)
+
+    await ops_test.model.relate(CHARM_NAME, tester1)
+    await ops_test.model.relate(CHARM_NAME, tester2)
+
+    expected_sidebar_items = [
+        *generate_sidebar_items(tester1),
+        *generate_sidebar_items(tester2),
+    ]
+
+    # Wait for everything to settle
+    await ops_test.model.wait_for_idle(
+        raise_on_error=True,
+        raise_on_blocked=True,
+        status="active",
+        timeout=150,
+    )
+
+    # Assert that the configmap has the expected links
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    sidebar_items = json.loads(configmap.data["links"])["menuLinks"]
+    sidebar_item_text = [item["text"] for item in sidebar_items]
+
+    # Order is not guaranteed, so check that each is included individually
+    assert len(sidebar_items) == len(expected_sidebar_items)
+    for item in expected_sidebar_items:
+        # For some reason, comparing sidebar items did not work here.  Comparing sidebar item
+        # names as an approximation.
+        assert item.text in sidebar_item_text
+
+
+@pytest.mark.asyncio
+def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
+    """Tests all dashboard links other than the sidebar."""
     driver, wait, url = driver
-
-    # Ensure that sidebar links are set up properly
-    links = [
-        "/jupyter/",
-        "/pipeline/#/experiments",
-        "/pipeline/#/pipelines",
-        "/pipeline/#/runs",
-        "/pipeline/#/recurringruns",
-        "/volumes/",
-        "/katib/",
-        "/tensorboards/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(["main-page", f"iframe-link[href='{link}']"])
-        wait.until(lambda x: x.execute_script(script))
-
-    # Ensure that quick links are set up properly
-    links = [
-        "/pipeline/",
-        "/pipeline/#/runs",
-        "/jupyter/new?namespace=kubeflow",
-        "/katib/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(
-            [
-                "main-page",
-                "dashboard-view",
-                f"iframe-link[href='{link}']",
-            ]
-        )
-        wait.until(lambda x: x.execute_script(script))
 
     # Ensure that doc links are set up properly
     links = [
@@ -172,11 +201,3 @@ def test_default_sidebar_links(driver: Tuple[webdriver.Chrome, WebDriverWait, st
             ]
         )
         wait.until(lambda x: x.execute_script(script))
-
-
-@pytest.mark.asyncio
-async def test_configmap_contents(lightkube_client: Client):
-    expected_links = json.loads(Path("./src/config/sidebar_config.json").read_text())
-    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    links = json.loads(configmap.data["links"])
-    assert links == expected_links

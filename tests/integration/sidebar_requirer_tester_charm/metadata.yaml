@@ -1,0 +1,8 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: kubeflow-dashboard-requirer-mock
+description: none
+summary: none
+requires:
+  sidebar:
+    interface: kubeflow_dashboard_sidebar
