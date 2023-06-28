@@ -22,6 +22,70 @@ And create a relation to dashboard:
 juju relate kubeflow-profiles kubeflow-dashboard
 ```
 
+### Managing Dashboard Sidebar Links
+
+Links in the dashboard can be managed through:
+* relating applications to this charm on the `sidebar` relation
+* adding sidebar links through the `additional-sidebar-links` config option.
+
+Sidebar item ordering can be managed through the `sidebar-link-order` config option. 
+
+#### Adding Sidebar Links through the `sidebar` Relation
+
+To relate an application to this charm, use the charm library for the [KubeflowDashboardSidebarRequirer](https://github.com/canonical/kubeflow-dashboard-operator/blob/main/lib/charms/kubeflow_dashboard/v1/kubeflow_dashboard_sidebar.py).  See that file for usage instructions.
+
+#### Adding Sidebar Links through the `additional-sidebar-links` Config
+
+The `additional-sidebar-links` config allows for users to specify YAML or JSON input defining sidebar links.  For example, you can define a file `my_links.yaml`:
+
+```yaml
+- text: Some link
+  link: /some-page
+  type: item
+  icon: book
+- text: Some other link
+  link: /some-other-page
+  type: item
+  icon: book
+```
+
+Where:
+* text: the text shown on the sidebar
+* link: the *relative* link within the platform (cannot be an external link - must be something that shares our gateway)
+* type: always `item`
+* icon: any icon from [here](https://kevingleason.me/Polymer-Todo/bower_components/iron-icons/demo/index.html)
+
+To pass this to Juju, do:
+
+```
+juju config kubeflow-dashboard additional-sidebar-links=@my_links.yaml
+```
+
+To edit existing links, export them to a file, edit the file, then import back to Juju:
+
+```
+juju config kubeflow-dashboard additional-sidebar-links > links_to_edit.yaml
+
+# edit the file
+
+juju config kubeflow-dashboard additional-sidebar-links=@links_to_edit.yaml
+```
+
+#### Define the Order of Sidebar Links
+
+You can define the order of the sidebar links via a YAML or JSON list of strings in the `sidebar-link-order` config.  For example:
+
+```
+juju config kubeflow-dashboard sidebar-link-order='["link1 text", "link2 text"]'
+```
+
+Where each string in the list is the `text` value that shows in the sidebar.  The charm will order the sidebar links such that:
+
+* links that are included in `sidebar-link-order`, in the order from that configuration
+* any remaining links, in alphabetical order
+
+Any link text that is defined in `sidebar-link-order` but not matching a sidebar item will be silently ignored, this way you can set defaults without needing to update them if links are removed.
+
 ## Looking for a fully supported platform for MLOps?
 
 Canonical [Charmed Kubeflow](https://charmed-kubeflow.io) is a state of the art, fully supported MLOps platform that helps data scientists collaborate on AI innovation on any cloud from concept to production, offered by Canonical - the publishers of [Ubuntu](https://ubuntu.com).
