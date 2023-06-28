@@ -344,7 +344,7 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
     The sorted order of the returned list will be:
     * any links who have a text field that matches a string in `preferred_link_text`, in the order
       specified in preferred_link_text
-    * any remaining links, in the order they appear in sidebar_items
+    * any remaining links, in alphabetical order
 
     For example, if:
       sidebar_items=[SidebarItem(text="1"...), SidebarItem(text="2"...), SidebarItem(text="3"...)]
@@ -363,7 +363,10 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
     ordered_sidebar_items = [
         sidebar_items_lookup[text] for text in preferred_links if text in sidebar_items_lookup
     ]
-    remaining_sidebar_items = [item for item in sidebar_items if item.text not in preferred_links]
+
+    sidebar_items_names_alphabetical = sorted(sidebar_items_lookup.keys())
+
+    remaining_sidebar_items = [sidebar_items_lookup[name] for name in sidebar_items_names_alphabetical if name not in preferred_links]
     return ordered_sidebar_items + remaining_sidebar_items
 
 

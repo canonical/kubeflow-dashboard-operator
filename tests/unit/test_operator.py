@@ -488,6 +488,12 @@ class TestSidebarLinks:
             (
                 [
                     SidebarItem(
+                        text="3",
+                        link="/3",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
                         text="1",
                         link="/1",
                         type="item",
@@ -495,34 +501,28 @@ class TestSidebarLinks:
                     ),
                     SidebarItem(
                         text="2",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    SidebarItem(
-                        text="3",
-                        link="/1",
+                        link="/2",
                         type="item",
                         icon="assessment",
                     ),
                 ],
-                ("2", "3"),
+                ("2", ),
                 [
                     SidebarItem(
                         text="2",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    SidebarItem(
-                        text="3",
-                        link="/1",
+                        link="/2",
                         type="item",
                         icon="assessment",
                     ),
                     SidebarItem(
                         text="1",
                         link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/3",
                         type="item",
                         icon="assessment",
                     ),
