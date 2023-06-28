@@ -31,9 +31,9 @@ SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
 
 
 @pytest.fixture(scope="module")
-def copy_grafana_libraries_into_tester_charm() -> None:
+def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/kubeflow_dashboard/v1/kubeflow_dashboard_sidebar.py")
+    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_sidebar.py")
     Path(SIDEBAR_REQUIRER_TESTER_CHARM_PATH, lib.parent).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(lib.as_posix(), (SIDEBAR_REQUIRER_TESTER_CHARM_PATH / lib).as_posix())
 
@@ -140,7 +140,7 @@ async def test_configmap_contents_no_relations(lightkube_client: Client):
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
-    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when relations are present."""
     tester1 = "kubeflow-dashboard-requirer-tester1"
