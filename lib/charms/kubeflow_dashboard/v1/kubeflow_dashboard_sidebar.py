@@ -164,13 +164,13 @@ class KubeflowDashboardSidebarProvider(Object):
         Args:
             omit_breaking_app: If True and this is called during a sidebar-relation-broken event,
                                the remote app's data will be omitted.  For more context, see:
-                               https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+                               https://github.com/canonical/kubeflow-dashboard-operator/issues/124
 
         Returns:
             List of SidebarItems defining the dashboard sidebar for all related applications.
         """
         # If this is a relation-broken event, remove the departing app from the relation data if
-        # it exists.  See: https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+        # it exists.  See: https://github.com/canonical/kubeflow-dashboard-operator/issues/124
         if omit_breaking_app:
             other_app_to_skip = get_name_of_breaking_app(relation_name=self._relation_name)
         else:
@@ -201,7 +201,7 @@ class KubeflowDashboardSidebarProvider(Object):
         Args:
             omit_breaking_app: If True and this is called during a sidebar-relation-broken event,
                                the remote app's data will be omitted.  For more context, see:
-                               https://chat.charmhub.io/charmhub/pl/oo4z6w3us7ryt8uh5r9mbchzto
+                               https://github.com/canonical/kubeflow-dashboard-operator/issues/124
 
         Returns:
             JSON string of all SidebarItems for all related applications, each as dicts.
