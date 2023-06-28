@@ -11,6 +11,7 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
+from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -18,10 +19,9 @@ from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
 
 from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG
-from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
-from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -188,7 +188,7 @@ async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_links_from_config(
-        ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when user-driven links added."""
     # Arrange
@@ -213,11 +213,13 @@ async def test_configmap_contents_with_links_from_config(
     expected_sidebar_items = [
         *generate_sidebar_items("tester1"),
         *generate_sidebar_items("tester2"),
-        *config_sidebar_items
+        *config_sidebar_items,
     ]
 
     # Act
-    await ops_test.model.applications[CHARM_NAME].set_config({ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)})
+    await ops_test.model.applications[CHARM_NAME].set_config(
+        {ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)}
+    )
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(

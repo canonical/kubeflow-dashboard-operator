@@ -13,7 +13,7 @@ from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarProvider,
     SidebarItem,
-    sidebar_items_to_json
+    sidebar_items_to_json,
 )
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
