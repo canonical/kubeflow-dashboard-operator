@@ -11,7 +11,6 @@ from typing import Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG, SIDEBAR_LINKS_ORDER_CONFIG
 from charms.kubeflow_dashboard.v1.kubeflow_dashboard_sidebar import SidebarItem
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
@@ -21,6 +20,8 @@ from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
+
+from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG, SIDEBAR_LINKS_ORDER_CONFIG
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -32,6 +33,7 @@ SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
     "tests/integration/sidebar_requirer_tester_charm"
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
+
 
 @pytest.fixture(scope="module")
 def copy_grafana_libraries_into_tester_charm() -> None:
@@ -292,5 +294,3 @@ async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
         # For some reason, comparing sidebar items did not work here.  Comparing sidebar item
         # names as an approximation.
         assert item.text in sidebar_item_text
-
-
