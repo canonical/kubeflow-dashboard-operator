@@ -144,7 +144,7 @@ async def test_configmap_contents_no_relations_or_config(lightkube_client: Clien
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
-    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when relations are present."""
     tester1 = "kubeflow-dashboard-requirer-tester1"
@@ -188,7 +188,7 @@ async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_links_from_config(
-    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when user-driven links added."""
     # Arrange
