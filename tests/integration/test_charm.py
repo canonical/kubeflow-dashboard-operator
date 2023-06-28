@@ -199,9 +199,9 @@ async def test_configmap_contents_with_links_from_config(
     config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
 
     expected_sidebar_items = [
+        *config_sidebar_items,
         *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
         *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
-        *config_sidebar_items,
     ]
 
     # Act
@@ -233,14 +233,14 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
             type="item",
             icon="assessment",
         ),
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
         SidebarItem(
             text="1",
             link="/1",
             type="item",
             icon="assessment",
         ),
+        *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
+        *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
     ]
 
     await ops_test.model.applications[CHARM_NAME].set_config(
