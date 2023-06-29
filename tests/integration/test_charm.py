@@ -32,6 +32,7 @@ PROFILES_CHARM_NAME = "kubeflow-profiles"
 SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
     "tests/integration/sidebar_requirer_tester_charm"
 ).absolute()
+TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
 
 
 @pytest.fixture(scope="module")
@@ -147,8 +148,8 @@ async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when relations are present."""
-    tester1 = "kubeflow-dashboard-requirer-tester1"
-    tester2 = "kubeflow-dashboard-requirer-tester2"
+    tester1 = f"{TESTER_CHARM_NAME}1"
+    tester2 = f"{TESTER_CHARM_NAME}2"
     charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")
     await ops_test.model.deploy(charm, application_name=tester1)
 
@@ -211,8 +212,8 @@ async def test_configmap_contents_with_links_from_config(
     config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
 
     expected_sidebar_items = [
-        *generate_sidebar_items("tester1"),
-        *generate_sidebar_items("tester2"),
+        *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
+        *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
         *config_sidebar_items,
     ]
 
