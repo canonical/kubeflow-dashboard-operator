@@ -147,7 +147,12 @@ async def test_configmap_contents_no_relations_or_config(lightkube_client: Clien
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard sidebar link configmap when relations are present."""
+    """Tests the contents of the dashboard sidebar link configmap when relations are present.
+
+    This test uses ./tests/integration/sidebar_requirer_tester_charm, a mocker charm for the
+    requirer side of the relation.  That charm is a simple charm that implements the Requirer side
+    of the dashboard lib in a predictable way.
+    """
     tester1 = f"{TESTER_CHARM_NAME}1"
     tester2 = f"{TESTER_CHARM_NAME}2"
     charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")
