@@ -273,7 +273,7 @@ class KubeflowDashboardOperator(CharmBase):
 
         try:
             user_sidebar_links = yaml.safe_load(sidebar_config)
-        except Exception as err:  # TODO: Make this the right error
+        except yaml.YAMLError as err:
             self.logger.warning(f"{error_message}  Got error: {err}")
             return []
 
