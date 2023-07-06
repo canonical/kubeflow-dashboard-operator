@@ -6,7 +6,7 @@ import shutil
 from dataclasses import asdict
 from pathlib import Path
 from time import sleep
-from typing import Tuple, List, Dict
+from typing import Dict, List, Tuple
 
 import pytest
 import pytest_asyncio
@@ -262,8 +262,10 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     )
 
     # Assert
-    actual_sidebar_items = await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
-    assert actual_sidebar_items[0]['text'] == expected_sidebar_items[0].text
+    actual_sidebar_items = await assert_links_in_configmap(
+        expected_sidebar_items, lightkube_client
+    )
+    assert actual_sidebar_items[0]["text"] == expected_sidebar_items[0].text
 
 
 @pytest.mark.asyncio
