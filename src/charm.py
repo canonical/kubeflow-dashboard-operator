@@ -4,12 +4,16 @@
 
 import json
 import logging
+from typing import List
 
+import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
     KubeflowDashboardSidebarProvider,
+    SidebarItem,
+    sidebar_items_to_json,
 )
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
@@ -21,6 +25,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
+ADDITIONAL_SIDEBAR_LINKS_CONFIG = "additional-sidebar-links"
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
@@ -96,11 +101,13 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def _context(self) -> dict:
         """Returns the context used to create Kubernetes resources."""
+        sidebar_items_as_json = self._get_sidebar_items_as_json()
+
         return {
             "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self._configmap_name,
-            "links": self.sidebar_provider.get_sidebar_items_as_json(),
+            "links": sidebar_items_as_json,
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
 
@@ -232,6 +239,51 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]
+
+    def _get_sidebar_items(self) -> List[SidebarItem]:
+        """Returns a list of all SidebarItems for this charm.
+
+        Includes sidebar items defined through relations and user config.
+        """
+        sidebar_items = []
+        sidebar_items.extend(self.sidebar_provider.get_sidebar_items())
+        sidebar_items.extend(self._get_sidebar_items_from_config())
+        return sidebar_items
+
+    def _get_sidebar_items_as_json(self) -> str:
+        """Returns a list of all SidebarItems for this charm, as a JSON string.
+
+        Includes sidebar items defined through relations and user config.
+        """
+        return sidebar_items_to_json(self._get_sidebar_items())
+
+    def _get_sidebar_items_from_config(self) -> List[SidebarItem]:
+        """Returns a list of SidebarItems as defined by the additional-sidebar-links config.
+
+        If there are errors in parsing the config, this returns an empty list and logs a warning.
+        """
+        error_message = (
+            f"Cannot parse user-defined sidebar links from config "
+            f"`{ADDITIONAL_SIDEBAR_LINKS_CONFIG}` - ignoring this input."
+        )
+
+        sidebar_config = self.model.config[ADDITIONAL_SIDEBAR_LINKS_CONFIG]
+        if not sidebar_config:
+            return []
+
+        try:
+            user_sidebar_links = yaml.safe_load(sidebar_config)
+        except yaml.YAMLError as err:
+            self.logger.warning(f"{error_message}  Got error: {err}")
+            return []
+
+        try:
+            user_sidebar_links = [SidebarItem(**item) for item in user_sidebar_links]
+        except TypeError as err:
+            self.logger.warning(f"{error_message}  Got error: {err}")
+            return []
+
+        return user_sidebar_links
 
     def main(self, _) -> None:
         """Main entry point for the Charm."""

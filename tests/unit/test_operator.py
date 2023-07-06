@@ -18,7 +18,7 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 
-from charm import SIDEBAR_RELATION_NAME, KubeflowDashboardOperator
+from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG, SIDEBAR_RELATION_NAME, KubeflowDashboardOperator
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -248,7 +248,7 @@ class TestCharm:
             harness_with_profiles.charm.on.remove.emit()
 
 
-class TestSidebarRelation:
+class TestSidebarLinks:
     """Tests for the sidebar relation."""
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -320,6 +320,107 @@ class TestSidebarRelation:
             for item in json.loads(harness_with_profiles.charm._context["links"])
         ]
         assert actual_items == relations[2]["sidebar_items"]
+
+    @pytest.mark.parametrize(
+        "user_links_as_sidebar_items",
+        (
+            [],  # Empty config
+            [
+                SidebarItem(
+                    text="1",
+                    link="/1",
+                    type="item",
+                    icon="assessment",
+                ),
+                SidebarItem(
+                    text="2",
+                    link="/2",
+                    type="item",
+                    icon="assessment",
+                ),
+            ],
+        ),
+    )
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_get_sidebar_items_from_config_with_valid_links(
+        self, harness, user_links_as_sidebar_items
+    ):
+        # Arrange
+        expected_links = user_links_as_sidebar_items
+        expected_links_dicts = [asdict(link) for link in expected_links]
+
+        harness.update_config({ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(expected_links_dicts)})
+        harness.begin()
+
+        # Act
+        actual_links = harness.charm._get_sidebar_items_from_config()
+
+        # Assert
+        assert actual_links == expected_links
+
+    @pytest.mark.parametrize(
+        "config_yaml",
+        (
+            "[malformed yaml",
+            '[{"correct yaml with incomplete sidebar item dicts": "x"}]',
+        ),
+    )
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_get_sidebar_items_from_config_with_bad_input(self, harness, config_yaml):
+        # Arrange
+        harness.update_config({ADDITIONAL_SIDEBAR_LINKS_CONFIG: config_yaml})
+        harness.begin()
+
+        harness.charm.logger = MagicMock()
+
+        # Act/Assert
+        actual_links = harness.charm._get_sidebar_items_from_config()
+
+        # Assert
+        # No links are parsed
+        assert actual_links == []
+
+        # Warning sent to logger
+        assert harness.charm.logger.warning.call_count == 1
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_sidebar_relation_and_config_together(
+        self,
+        harness_with_profiles: Harness,
+    ):
+        """Tests that combining relation- and user-driven sidebar items works as expected."""
+        # Arrange
+        harness = harness_with_profiles
+
+        # Add relation-based sidebar items
+        relation = add_sidebar_relation(harness, other_app_name="other")
+        relation_data = add_data_to_sidebar_relation(harness, relation)
+
+        # Add config-based sidebar items
+        config_sidebar_items = [
+            SidebarItem(
+                text="1",
+                link="/1",
+                type="item",
+                icon="assessment",
+            ),
+        ]
+        config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
+        harness.update_config(
+            {ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)}
+        )
+
+        expected_sidebar_items = relation_data["sidebar_items"] + config_sidebar_items
+        harness.begin()
+
+        # Act
+        actual_items = [
+            SidebarItem(**item) for item in json.loads(harness.charm._context["links"])
+        ]
+
+        # Assert
+        # Should include both relation- and config-based items, ordered relation then config
+        assert actual_items == expected_sidebar_items
 
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
