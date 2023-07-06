@@ -36,9 +36,9 @@ TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
 
 
 @pytest.fixture(scope="module")
-def copy_grafana_libraries_into_tester_charm() -> None:
+def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/kubeflow_dashboard/v1/kubeflow_dashboard_sidebar.py")
+    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_sidebar.py")
     Path(SIDEBAR_REQUIRER_TESTER_CHARM_PATH, lib.parent).mkdir(parents=True, exist_ok=True)
     shutil.copyfile(lib.as_posix(), (SIDEBAR_REQUIRER_TESTER_CHARM_PATH / lib).as_posix())
 
@@ -145,9 +145,14 @@ async def test_configmap_contents_no_relations_or_config(lightkube_client: Clien
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
-    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard sidebar link configmap when relations are present."""
+    """Tests the contents of the dashboard sidebar link configmap when relations are present.
+
+    This test uses ./tests/integration/sidebar_requirer_tester_charm, a mocker charm for the
+    requirer side of the relation.  That charm is a simple charm that implements the Requirer side
+    of the dashboard lib in a predictable way.
+    """
     tester1 = f"{TESTER_CHARM_NAME}1"
     tester2 = f"{TESTER_CHARM_NAME}2"
     charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")
