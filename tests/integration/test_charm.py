@@ -6,7 +6,7 @@ import shutil
 from dataclasses import asdict
 from pathlib import Path
 from time import sleep
-from typing import Tuple
+from typing import Tuple, List, Dict
 
 import pytest
 import pytest_asyncio
@@ -181,7 +181,7 @@ async def test_configmap_contents_with_relations(
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_links_from_config(
-    ops_test: OpsTest, copy_grafana_libraries_into_tester_charm, lightkube_client: Client
+    ops_test: OpsTest, lightkube_client: Client
 ):
     """Tests the contents of the dashboard sidebar link configmap when user-driven links added."""
     # Arrange
@@ -226,6 +226,7 @@ async def test_configmap_contents_with_links_from_config(
     await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
 
 
+@pytest.mark.asyncio
 async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
     """Tests that, if we add a sidebar link order, the configmap contents update as expected."""
     # Move the user-driven link '2' from the previous test to the top of the list
@@ -261,7 +262,8 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     )
 
     # Assert
-    await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
+    actual_sidebar_items = await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
+    assert actual_sidebar_items[0]['text'] == expected_sidebar_items[0].text
 
 
 @pytest.mark.asyncio
@@ -288,8 +290,11 @@ def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, 
         wait.until(lambda x: x.execute_script(script))
 
 
-async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
-    """Asserts that the dashboard configmap has exactly the links expected."""
+async def assert_links_in_configmap(expected_sidebar_items, lightkube_client) -> List[Dict]:
+    """Asserts that the dashboard configmap has exactly the links expected.
+
+    Returns the sidebar_items pulled from the configmap in case further processing is needed.
+    """
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     sidebar_items = json.loads(configmap.data["links"])["menuLinks"]
     sidebar_item_text = [item["text"] for item in sidebar_items]
@@ -299,3 +304,5 @@ async def assert_links_in_configmap(expected_sidebar_items, lightkube_client):
         # For some reason, comparing sidebar items did not work here.  Comparing sidebar item
         # names as an approximation.
         assert item.text in sidebar_item_text
+
+    return sidebar_items
