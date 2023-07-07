@@ -30,6 +30,7 @@ K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
+SIDEBAR_LINKS_ORDER_CONFIG = "sidebar-link-order"
 SIDEBAR_RELATION_NAME = "sidebar"
 
 
@@ -248,6 +249,10 @@ class KubeflowDashboardOperator(CharmBase):
         sidebar_items = []
         sidebar_items.extend(self.sidebar_provider.get_sidebar_items())
         sidebar_items.extend(self._get_sidebar_items_from_config())
+        sidebar_items = sort_sidebar_items(
+            sidebar_items, preferred_links=self._get_sidebar_items_order_from_config()
+        )
+
         return sidebar_items
 
     def _get_sidebar_items_as_json(self) -> str:
@@ -285,6 +290,23 @@ class KubeflowDashboardOperator(CharmBase):
 
         return user_sidebar_links
 
+    def _get_sidebar_items_order_from_config(self) -> List[str]:
+        """Returns a list of strings defining the sidebar-link-order.
+
+        If there are errors in parsing the config, this returns an empty list and logs a warning.
+        """
+        error_message = (
+            f"Cannot parse user-defined sidebar link order from config "
+            f"`{SIDEBAR_LINKS_ORDER_CONFIG}` - ignoring this input and leaving links unordered."
+        )
+
+        sidebar_link_order = self.model.config[SIDEBAR_LINKS_ORDER_CONFIG]
+        try:
+            return yaml.safe_load(sidebar_link_order)
+        except Exception as err:
+            self.logger.warning(f"{error_message}  Got error: {err}")
+            return []
+
     def main(self, _) -> None:
         """Main entry point for the Charm."""
         try:
@@ -314,6 +336,60 @@ class KubeflowDashboardOperator(CharmBase):
             self.logger.warning(f"Failed to delete resources, with error: {e}")
             raise e
         self.unit.status = MaintenanceStatus("K8s resources removed")
+
+
+def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[str]):
+    """Sorts a list of SidebarItems by their link text, moving preferred links to the top.
+
+    The sorted order of the returned list will be:
+    * any links who have a text field that matches a string in `preferred_link_text`, in the order
+      specified in preferred_link_text
+    * any remaining links, in alphabetical order
+
+    For example, if:
+      sidebar_items=[SidebarItem(text="1"...), SidebarItem(text="2"...), SidebarItem(text="3"...)]
+      preferred_link_text=["2", "4"]
+    The return will be:
+      sidebar_items=[SidebarItem(text="2"...), SidebarItem(text="1"...), SidebarItem(text="3"...)]
+
+    If there are any links that have the same text, they will all be placed in the preferred
+    links at the top.  They will be in the same order as provided in sidebar_items.  For example:
+
+    For example, if:
+      sidebar_items=[
+        SidebarItem(text="other"...),
+        SidebarItem(text="1", link="1a", ...),
+        SidebarItem(text="1", link="1b", ...),
+      ]
+      preferred_link_text=["1"]
+    The return will be:
+      sidebar_items=[
+        SidebarItem(text="1", link="1a", ...),
+        SidebarItem(text="1", link="1b", ...),
+        SidebarItem(text="other"...),
+      ]
+
+    Args:
+        sidebar_items: List of SidebarItems to sort
+        preferred_links: List of strings of SidebarItem text values
+
+    Returns:
+        Ordered list of SidebarItems
+    """
+    ordered_sidebar_items = []
+    removed_sidebar_items_index = set()
+    for preferred_link in preferred_links:
+        for i, sidebar_item in enumerate(sidebar_items):
+            if sidebar_item.text == preferred_link:
+                ordered_sidebar_items.append(sidebar_item)
+                removed_sidebar_items_index.add(i)
+
+    remaining_sidebar_items = [
+        item for i, item in enumerate(sidebar_items) if i not in removed_sidebar_items_index
+    ]
+    remaining_sidebar_items = sorted(remaining_sidebar_items, key=lambda item: item.text)
+
+    return ordered_sidebar_items + remaining_sidebar_items
 
 
 if __name__ == "__main__":
