@@ -6,12 +6,12 @@ from ops.charm import CharmBase
 from ops.testing import Harness
 
 from lib.charms.harness_extensions.v0.capture_events import capture
-from lib.charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
-    SIDEBAR_ITEMS_FIELD,
-    KubeflowDashboardSidebarDataUpdatedEvent,
-    KubeflowDashboardSidebarProvider,
-    KubeflowDashboardSidebarRequirer,
-    SidebarItem,
+from lib.charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
+    DASHBOARD_LINKS_FIELD,
+    KubeflowDashboardLinksUpdatedEvent,
+    KubeflowDashboardLinksProvider,
+    KubeflowDashboardLinksRequirer,
+    DashboardLink,
 )
 
 RELATION_NAME = "sidebar"
@@ -27,8 +27,8 @@ requires:
   sidebar:
     interface: kubeflow_dashboard_sidebar
 """
-REQUIRER_SIDEBAR_ITEMS = [
-    SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+REQUIRER_DASHBOARD_LINKS = [
+    DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
     for i in range(3)
 ]
 
@@ -38,7 +38,7 @@ class DummyProviderCharm(CharmBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sidebar_provider = KubeflowDashboardSidebarProvider(
+        self.sidebar_provider = KubeflowDashboardLinksProvider(
             charm=self, relation_name=RELATION_NAME
         )
 
@@ -48,10 +48,10 @@ class DummyRequirerCharm(CharmBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sidebar_requirer = KubeflowDashboardSidebarRequirer(
+        self.sidebar_requirer = KubeflowDashboardLinksRequirer(
             charm=self,
             relation_name=RELATION_NAME,
-            sidebar_items=REQUIRER_SIDEBAR_ITEMS,
+            dashboard_links=REQUIRER_DASHBOARD_LINKS,
         )
 
 
@@ -65,11 +65,11 @@ class TestProvider:
 
         # Create data
         expected_sidebar_items_per_relation = [
-            SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
             for i in range(3)
         ]
         databag = {
-            SIDEBAR_ITEMS_FIELD: json.dumps(
+            DASHBOARD_LINKS_FIELD: json.dumps(
                 [asdict(sidebar_item) for sidebar_item in expected_sidebar_items_per_relation]
             )
         }
@@ -91,8 +91,8 @@ class TestProvider:
         harness.begin()
 
         # Act
-        # Get SidebarItems from relation data
-        actual_sidebar_items = harness.charm.sidebar_provider.get_sidebar_items()
+        # Get DashboardLinks from relation data
+        actual_sidebar_items = harness.charm.sidebar_provider.get_dashboard_links()
 
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
@@ -112,8 +112,8 @@ class TestProvider:
         harness.begin()
 
         # Act
-        # Get SidebarItems from relation data
-        actual_sidebar_items = harness.charm.sidebar_provider.get_sidebar_items()
+        # Get DashboardLinks from relation data
+        actual_sidebar_items = harness.charm.sidebar_provider.get_dashboard_links()
 
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
@@ -127,11 +127,11 @@ class TestProvider:
 
         # Create data
         expected_sidebar_items = [
-            SidebarItem(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
             for i in range(3)
         ]
         databag = {
-            SIDEBAR_ITEMS_FIELD: json.dumps(
+            DASHBOARD_LINKS_FIELD: json.dumps(
                 [asdict(sidebar_item) for sidebar_item in expected_sidebar_items]
             )
         }
@@ -148,22 +148,22 @@ class TestProvider:
         harness.begin()
 
         # Act
-        # Get SidebarItems from relation data as json
-        actual_sidebar_items_as_json = harness.charm.sidebar_provider.get_sidebar_items_as_json()
+        # Get DashboardLinks from relation data as json
+        actual_sidebar_items_as_json = harness.charm.sidebar_provider.get_dashboard_links_as_json()
 
         # Assert
         assert actual_sidebar_items_as_json == expected_sidebar_items_as_json
 
     def test_emit_data_updated(self):
-        """Tests that the Provider library emits KubeflowDashboardSidebarDataUpdatedEvents."""
+        """Tests that the Provider library emits KubeflowDashboardLinksUpdatedEvents."""
         # Arrange
         # Set up charm
         other_app = "other"
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Create data
-        sidebar_item = SidebarItem(text="text", link="link", type="type", icon="icon")
-        databag = {SIDEBAR_ITEMS_FIELD: json.dumps([asdict(sidebar_item)])}
+        sidebar_item = DashboardLink(text="text", link="link", type="type", icon="icon")
+        databag = {DASHBOARD_LINKS_FIELD: json.dumps([asdict(sidebar_item)])}
 
         harness.begin()
 
@@ -172,14 +172,14 @@ class TestProvider:
 
         # Add data to relation
         # Assert that we emit a data_updated event
-        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent):
+        with capture(harness.charm, KubeflowDashboardLinksUpdatedEvent):
             harness.update_relation_data(
                 relation_id=relation_id, app_or_unit=other_app, key_values=databag
             )
 
         # Remove relation
         # Assert that we emit a data_updated event
-        with capture(harness.charm, KubeflowDashboardSidebarDataUpdatedEvent):
+        with capture(harness.charm, KubeflowDashboardLinksUpdatedEvent):
             harness.remove_relation(relation_id=relation_id)
 
 
@@ -206,7 +206,7 @@ class TestRequirer:
         # Assert
         actual_sidebar_items = get_sidebar_items_from_relation(harness, relation_id, this_app)
 
-        assert actual_sidebar_items == REQUIRER_SIDEBAR_ITEMS
+        assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
 
     def test_send_sidebar_on_relation_created(self):
         """Test that the sidebar Requirer correctly handles the relation created event."""
@@ -224,7 +224,7 @@ class TestRequirer:
             harness, relation_id, harness.model.app
         )
 
-        assert actual_sidebar_items == REQUIRER_SIDEBAR_ITEMS
+        assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
 
     def test_send_sidebar_without_leadership(self):
         """Tests whether library incorrectly sends sidebar data when unit is not leader."""
@@ -247,9 +247,9 @@ class TestRequirer:
         assert raw_relation_data == {}
 
 
-def get_sidebar_items_from_relation(harness, relation_id, this_app) -> List[SidebarItem]:
-    """Returns the list of SidebarItems from a sidebar relation on a harness."""
+def get_sidebar_items_from_relation(harness, relation_id, this_app) -> List[DashboardLink]:
+    """Returns the list of DashboardLinks from a sidebar relation on a harness."""
     raw_relation_data = harness.get_relation_data(relation_id=relation_id, app_or_unit=this_app)
-    relation_data_as_dicts = json.loads(raw_relation_data[SIDEBAR_ITEMS_FIELD])
-    actual_sidebar_items = [SidebarItem(**data) for data in relation_data_as_dicts]
-    return actual_sidebar_items
+    relation_data_as_dicts = json.loads(raw_relation_data[DASHBOARD_LINKS_FIELD])
+    actual_dashboard_links = [DashboardLink(**data) for data in relation_data_as_dicts]
+    return actual_dashboard_links

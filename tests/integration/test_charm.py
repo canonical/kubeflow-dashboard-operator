@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple
 import pytest
 import pytest_asyncio
 import yaml
-from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import SidebarItem
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import DashboardLink
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -19,9 +19,9 @@ from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from sidebar_requirer_tester_charm.src.charm import generate_sidebar_items
+from dashboard_links_requirer_tester_charm.src.charm import generate_menu_links
 
-from charm import ADDITIONAL_SIDEBAR_LINKS_CONFIG, SIDEBAR_LINKS_ORDER_CONFIG
+from charm import ADDITIONAL_MENU_LINKS_CONFIG, MENU_LINKS_ORDER_CONFIG
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -29,8 +29,8 @@ CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
 PROFILES_CHARM_NAME = "kubeflow-profiles"
 
-SIDEBAR_REQUIRER_TESTER_CHARM_PATH = Path(
-    "tests/integration/sidebar_requirer_tester_charm"
+DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
+    "tests/integration/dashboard_links_requirer_tester_charm"
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
 
@@ -38,9 +38,9 @@ TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
 @pytest.fixture(scope="module")
 def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
-    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_sidebar.py")
-    Path(SIDEBAR_REQUIRER_TESTER_CHARM_PATH, lib.parent).mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(lib.as_posix(), (SIDEBAR_REQUIRER_TESTER_CHARM_PATH / lib).as_posix())
+    lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_links.py")
+    Path(DASHBOARD_LINKS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lib.as_posix(), (DASHBOARD_LINKS_REQUIRER_TESTER_CHARM / lib).as_posix())
 
 
 @pytest_asyncio.fixture
@@ -136,7 +136,7 @@ async def test_status(ops_test: OpsTest):
 
 @pytest.mark.asyncio
 async def test_configmap_contents_no_relations_or_config(lightkube_client: Client):
-    """Tests the contents of the dashboard sidebar link configmap when no relations are present."""
+    """Tests the contents of the dashboard link configmap when no relations are present."""
     expected_links = []
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])["menuLinks"]
@@ -147,15 +147,15 @@ async def test_configmap_contents_no_relations_or_config(lightkube_client: Clien
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard sidebar link configmap when relations are present.
+    """Tests the contents of the dashboard link configmap when relations are present.
 
-    This test uses ./tests/integration/sidebar_requirer_tester_charm, a mocker charm for the
+    This test uses ./tests/integration/dashboard_links_requirer_tester_charm, a mocker charm for the
     requirer side of the relation.  That charm is a simple charm that implements the Requirer side
     of the dashboard lib in a predictable way.
     """
     tester1 = f"{TESTER_CHARM_NAME}1"
     tester2 = f"{TESTER_CHARM_NAME}2"
-    charm = await ops_test.build_charm("./tests/integration/sidebar_requirer_tester_charm")
+    charm = await ops_test.build_charm("./tests/integration/dashboard_links_requirer_tester_charm")
     await ops_test.model.deploy(charm, application_name=tester1)
 
     await ops_test.model.deploy(charm, application_name=tester2)
@@ -163,9 +163,9 @@ async def test_configmap_contents_with_relations(
     await ops_test.model.relate(CHARM_NAME, tester1)
     await ops_test.model.relate(CHARM_NAME, tester2)
 
-    expected_sidebar_items = [
-        *generate_sidebar_items(tester1),
-        *generate_sidebar_items(tester2),
+    expected_menu_links = [
+        *generate_menu_links(tester1),
+        *generate_menu_links(tester2),
     ]
 
     # Wait for everything to settle
@@ -176,24 +176,24 @@ async def test_configmap_contents_with_relations(
         timeout=150,
     )
 
-    await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
+    await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents_with_links_from_config(
+async def test_configmap_contents_with_menu_links_from_config(
     ops_test: OpsTest, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard sidebar link configmap when user-driven links added."""
+    """Tests the contents of the dashboard menu link configmap when user-driven links added."""
     # Arrange
-    # Add config and check if we get additional sidebar links
-    config_sidebar_items = [
-        SidebarItem(
+    # Add config and check if we get additional menu links
+    config_menu_links = [
+        DashboardLink(
             text="1",
             link="/1",
             type="item",
             icon="assessment",
         ),
-        SidebarItem(
+        DashboardLink(
             text="2",
             link="/2",
             type="item",
@@ -201,17 +201,17 @@ async def test_configmap_contents_with_links_from_config(
         ),
     ]
 
-    config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
+    config_menu_links_as_dicts = [asdict(link) for link in config_menu_links]
 
-    expected_sidebar_items = [
-        *config_sidebar_items,
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
+    expected_menu_links = [
+        *config_menu_links,
+        *generate_menu_links(f"{TESTER_CHARM_NAME}1"),
+        *generate_menu_links(f"{TESTER_CHARM_NAME}2"),
     ]
 
     # Act
     await ops_test.model.applications[CHARM_NAME].set_config(
-        {ADDITIONAL_SIDEBAR_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)}
+        {ADDITIONAL_MENU_LINKS_CONFIG: yaml.dump(config_menu_links_as_dicts)}
     )
 
     # Wait for everything to settle
@@ -223,34 +223,34 @@ async def test_configmap_contents_with_links_from_config(
     )
 
     # Assert
-    await assert_links_in_configmap(expected_sidebar_items, lightkube_client)
+    await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
-    """Tests that, if we add a sidebar link order, the configmap contents update as expected."""
+async def test_configmap_contents_for_menu_link_with_ordering(ops_test: OpsTest, lightkube_client: Client):
+    """Tests that, if we add a menu link order, the configmap contents update as expected."""
     # Move the user-driven link '2' from the previous test to the top of the list
-    sidebar_link_order = ["2"]
+    menu_link_order = ["2"]
 
-    expected_sidebar_items = [
-        SidebarItem(
+    expected_menu_links = [
+        DashboardLink(
             text="2",
             link="/2",
             type="item",
             icon="assessment",
         ),
-        SidebarItem(
+        DashboardLink(
             text="1",
             link="/1",
             type="item",
             icon="assessment",
         ),
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}1"),
-        *generate_sidebar_items(f"{TESTER_CHARM_NAME}2"),
+        *generate_menu_links(f"{TESTER_CHARM_NAME}1"),
+        *generate_menu_links(f"{TESTER_CHARM_NAME}2"),
     ]
 
     await ops_test.model.applications[CHARM_NAME].set_config(
-        {SIDEBAR_LINKS_ORDER_CONFIG: yaml.dump(sidebar_link_order)}
+        {MENU_LINKS_ORDER_CONFIG: yaml.dump(menu_link_order)}
     )
 
     # Wait for everything to settle
@@ -262,15 +262,15 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     )
 
     # Assert
-    actual_sidebar_items = await assert_links_in_configmap(
-        expected_sidebar_items, lightkube_client
+    actual_menu_links = await assert_menulinks_in_configmap(
+        expected_menu_links, lightkube_client
     )
-    assert actual_sidebar_items[0]["text"] == expected_sidebar_items[0].text
+    assert actual_menu_links[0]["text"] == expected_menu_links[0].text
 
 
 @pytest.mark.asyncio
 def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
-    """Tests all dashboard links other than the sidebar."""
+    """Tests all dashboard links other than the menu links."""
     driver, wait, url = driver
 
     # Ensure that doc links are set up properly
@@ -292,19 +292,19 @@ def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, 
         wait.until(lambda x: x.execute_script(script))
 
 
-async def assert_links_in_configmap(expected_sidebar_items, lightkube_client) -> List[Dict]:
-    """Asserts that the dashboard configmap has exactly the links expected.
+async def assert_menulinks_in_configmap(expected_menu_links, lightkube_client) -> List[Dict]:
+    """Asserts that the dashboard configmap has exactly the menuLinks (sidebar links) expected.
 
-    Returns the sidebar_items pulled from the configmap in case further processing is needed.
+    Returns the menu link data pulled from the configmap in case further processing is needed.
     """
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    sidebar_items = json.loads(configmap.data["links"])["menuLinks"]
-    sidebar_item_text = [item["text"] for item in sidebar_items]
+    menu_links = json.loads(configmap.data["links"])["menuLinks"]
+    menu_links_text = [item["text"] for item in menu_links]
     # Order is not guaranteed, so check that each is included individually
-    assert len(sidebar_items) == len(expected_sidebar_items)
-    for item in expected_sidebar_items:
-        # For some reason, comparing sidebar items did not work here.  Comparing sidebar item
-        # names as an approximation.
-        assert item.text in sidebar_item_text
+    assert len(menu_links) == len(expected_menu_links)
+    for item in expected_menu_links:
+        # For some reason, comparing DashboardItems did not work here.  Comparing link texts
+        # as an approximation.
+        assert item.text in menu_links_text
 
-    return sidebar_items
+    return menu_links
