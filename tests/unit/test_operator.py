@@ -367,26 +367,26 @@ class TestSidebarLinks:
     @pytest.mark.parametrize(
         "user_links_as_sidebar_items",
         (
-                [],  # Empty config
-                [
-                    SidebarItem(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    SidebarItem(
-                        text="2",
-                        link="/2",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
+            [],  # Empty config
+            [
+                SidebarItem(
+                    text="1",
+                    link="/1",
+                    type="item",
+                    icon="assessment",
+                ),
+                SidebarItem(
+                    text="2",
+                    link="/2",
+                    type="item",
+                    icon="assessment",
+                ),
+            ],
         ),
     )
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_get_sidebar_items_from_config_as_json_with_valid_links(
-            self, harness, user_links_as_sidebar_items
+        self, harness, user_links_as_sidebar_items
     ):
         # Arrange
         expected_links = user_links_as_sidebar_items
@@ -523,47 +523,47 @@ class TestSidebarLinks:
             ),
             # Case where we have links that should be reordered
             (
-                    [
-                        SidebarItem(
-                            text="3",
-                            link="/3",
-                            type="item",
-                            icon="assessment",
-                        ),
-                        SidebarItem(
-                            text="1",
-                            link="/1",
-                            type="item",
-                            icon="assessment",
-                        ),
-                        SidebarItem(
-                            text="2",
-                            link="/2",
-                            type="item",
-                            icon="assessment",
-                        ),
-                    ],
-                    ("2", "3"),
-                    [
-                        SidebarItem(
-                            text="2",
-                            link="/2",
-                            type="item",
-                            icon="assessment",
-                        ),
-                        SidebarItem(
-                            text="3",
-                            link="/3",
-                            type="item",
-                            icon="assessment",
-                        ),
-                        SidebarItem(
-                            text="1",
-                            link="/1",
-                            type="item",
-                            icon="assessment",
-                        ),
-                    ],
+                [
+                    SidebarItem(
+                        text="3",
+                        link="/3",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/2",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+                ("2", "3"),
+                [
+                    SidebarItem(
+                        text="2",
+                        link="/2",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/3",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
             ),
             # Case where we have multiple links with the same text
             (

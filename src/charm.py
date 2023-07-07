@@ -384,7 +384,9 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
                 ordered_sidebar_items.append(sidebar_item)
                 removed_sidebar_items_index.add(i)
 
-    remaining_sidebar_items = [item for i, item in enumerate(sidebar_items) if i not in removed_sidebar_items_index]
+    remaining_sidebar_items = [
+        item for i, item in enumerate(sidebar_items) if i not in removed_sidebar_items_index
+    ]
     remaining_sidebar_items = sorted(remaining_sidebar_items, key=lambda item: item.text)
 
     return ordered_sidebar_items + remaining_sidebar_items
