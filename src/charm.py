@@ -352,6 +352,23 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
     The return will be:
       sidebar_items=[SidebarItem(text="2"...), SidebarItem(text="1"...), SidebarItem(text="3"...)]
 
+    If there are any links that have the same text, they will all be placed in the preferred
+    links at the top.  They will be in the same order as provided in sidebar_items.  For example:
+
+    For example, if:
+      sidebar_items=[
+        SidebarItem(text="other"...),
+        SidebarItem(text="1", link="1a", ...),
+        SidebarItem(text="1", link="1b", ...),
+      ]
+      preferred_link_text=["1"]
+    The return will be:
+      sidebar_items=[
+        SidebarItem(text="1", link="1a", ...),
+        SidebarItem(text="1", link="1b", ...),
+        SidebarItem(text="other"...),
+      ]
+
     Args:
         sidebar_items: List of SidebarItems to sort
         preferred_links: List of strings of SidebarItem text values
@@ -359,18 +376,17 @@ def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[s
     Returns:
         Ordered list of SidebarItems
     """
-    sidebar_items_lookup = {item.text: item for item in sidebar_items}
-    ordered_sidebar_items = [
-        sidebar_items_lookup[text] for text in preferred_links if text in sidebar_items_lookup
-    ]
+    ordered_sidebar_items = []
+    removed_sidebar_items_index = set()
+    for preferred_link in preferred_links:
+        for i, sidebar_item in enumerate(sidebar_items):
+            if sidebar_item.text == preferred_link:
+                ordered_sidebar_items.append(sidebar_item)
+                removed_sidebar_items_index.add(i)
 
-    sidebar_items_names_alphabetical = sorted(sidebar_items_lookup.keys())
+    remaining_sidebar_items = [item for i, item in enumerate(sidebar_items) if i not in removed_sidebar_items_index]
+    remaining_sidebar_items = sorted(remaining_sidebar_items, key=lambda item: item.text)
 
-    remaining_sidebar_items = [
-        sidebar_items_lookup[name]
-        for name in sidebar_items_names_alphabetical
-        if name not in preferred_links
-    ]
     return ordered_sidebar_items + remaining_sidebar_items
 
 

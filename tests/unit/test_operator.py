@@ -528,6 +528,74 @@ class TestSidebarLinks:
                         ),
                     ],
             ),
+            # Case where we have multiple links with the same text
+            (
+                [
+                    SidebarItem(
+                        text="3",
+                        link="/3",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1b",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/3b",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/2",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+                ("2", "3"),
+                [
+                    SidebarItem(
+                        text="2",
+                        link="/2",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/3",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="3",
+                        link="/3b",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="1",
+                        link="/1b",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+            ),
         ],
     )
     def test_sort_sidebar_items(self, sidebar_items, preferred_link_text, expected_result):
