@@ -365,6 +365,43 @@ class TestSidebarLinks:
         assert actual_links == expected_links
 
     @pytest.mark.parametrize(
+        "user_links_as_sidebar_items",
+        (
+                [],  # Empty config
+                [
+                    SidebarItem(
+                        text="1",
+                        link="/1",
+                        type="item",
+                        icon="assessment",
+                    ),
+                    SidebarItem(
+                        text="2",
+                        link="/2",
+                        type="item",
+                        icon="assessment",
+                    ),
+                ],
+        ),
+    )
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_get_sidebar_items_from_config_as_json_with_valid_links(
+            self, harness, user_links_as_sidebar_items
+    ):
+        # Arrange
+        expected_links = user_links_as_sidebar_items
+        expected_links_dicts = [asdict(link) for link in expected_links]
+
+        harness.update_config({ADDITIONAL_SIDEBAR_LINKS_CONFIG: json.dumps(expected_links_dicts)})
+        harness.begin()
+
+        # Act
+        actual_links = harness.charm._get_sidebar_items_from_config()
+
+        # Assert
+        assert actual_links == expected_links
+
+    @pytest.mark.parametrize(
         "config_yaml",
         (
             "[malformed yaml",
