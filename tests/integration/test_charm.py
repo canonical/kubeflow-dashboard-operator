@@ -12,6 +12,7 @@ import pytest
 import pytest_asyncio
 import yaml
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import DashboardLink
+from dashboard_links_requirer_tester_charm.src.charm import generate_menu_links
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
@@ -19,7 +20,6 @@ from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from dashboard_links_requirer_tester_charm.src.charm import generate_menu_links
 
 from charm import ADDITIONAL_MENU_LINKS_CONFIG, MENU_LINKS_ORDER_CONFIG
 
@@ -227,7 +227,9 @@ async def test_configmap_contents_with_menu_links_from_config(
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents_for_menu_link_with_ordering(ops_test: OpsTest, lightkube_client: Client):
+async def test_configmap_contents_for_menu_links_with_ordering(
+    ops_test: OpsTest, lightkube_client: Client
+):
     """Tests that, if we add a menu link order, the configmap contents update as expected."""
     # Move the user-driven link '2' from the previous test to the top of the list
     menu_link_order = ["2"]
@@ -262,9 +264,7 @@ async def test_configmap_contents_for_menu_link_with_ordering(ops_test: OpsTest,
     )
 
     # Assert
-    actual_menu_links = await assert_menulinks_in_configmap(
-        expected_menu_links, lightkube_client
-    )
+    actual_menu_links = await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
     assert actual_menu_links[0]["text"] == expected_menu_links[0].text
 
 

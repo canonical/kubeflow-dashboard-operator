@@ -2,8 +2,8 @@
 from typing import List
 
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
-    KubeflowDashboardLinksRequirer,
     DashboardLink,
+    KubeflowDashboardLinksRequirer,
 )
 from ops.charm import CharmBase
 from ops.main import main

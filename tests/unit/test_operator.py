@@ -20,11 +20,10 @@ from ops.testing import Harness
 
 from charm import (
     ADDITIONAL_MENU_LINKS_CONFIG,
-    MENU_LINKS_ORDER_CONFIG,
     DASHBOARD_LINKS_RELATION_NAME,
+    MENU_LINKS_ORDER_CONFIG,
     KubeflowDashboardOperator,
 )
-from src.charm import sort_sidebar_items
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -217,7 +216,7 @@ class TestCharm:
         configmap_handler.apply.assert_called_once()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-        actual_links = json.loads(harness_with_profiles.charm._context["links"])
+        actual_links = json.loads(harness_with_profiles.charm._context["menuLinks"])
         assert actual_links == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -265,7 +264,7 @@ class TestSidebarLinks:
         """Tests that context renders properly when no sidebar relations are present."""
         expected_links = []
         harness_with_profiles.begin()
-        actual_links = json.loads(harness_with_profiles.charm._context["links"])
+        actual_links = json.loads(harness_with_profiles.charm._context["menuLinks"])
         assert actual_links == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -289,7 +288,7 @@ class TestSidebarLinks:
 
         # Related apps, but no links
         expected_items = []
-        actual_items = json.loads(harness_with_profiles.charm._context["links"])
+        actual_items = json.loads(harness_with_profiles.charm._context["menuLinks"])
         assert actual_items == expected_items
 
         # Add links to relations[0]
@@ -298,7 +297,7 @@ class TestSidebarLinks:
 
         actual_items = [
             DashboardLink(**item)
-            for item in json.loads(harness_with_profiles.charm._context["links"])
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
         ]
         assert actual_items == relations[0]["sidebar_items"]
 
@@ -307,7 +306,7 @@ class TestSidebarLinks:
         relations[2].update(relation_data)
         actual_items = [
             DashboardLink(**item)
-            for item in json.loads(harness_with_profiles.charm._context["links"])
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
         ]
         assert actual_items == relations[0]["sidebar_items"] + relations[2]["sidebar_items"]
 
@@ -315,7 +314,7 @@ class TestSidebarLinks:
         harness_with_profiles.remove_relation(relation_id=relations[1]["rel_id"])
         actual_items = [
             DashboardLink(**item)
-            for item in json.loads(harness_with_profiles.charm._context["links"])
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
         ]
         assert actual_items == relations[0]["sidebar_items"] + relations[2]["sidebar_items"]
 
@@ -323,108 +322,9 @@ class TestSidebarLinks:
         harness_with_profiles.remove_relation(relation_id=relations[0]["rel_id"])
         actual_items = [
             DashboardLink(**item)
-            for item in json.loads(harness_with_profiles.charm._context["links"])
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
         ]
         assert actual_items == relations[2]["sidebar_items"]
-
-    @pytest.mark.parametrize(
-        "user_links_as_sidebar_items",
-        (
-            [],  # Empty config
-            [
-                DashboardLink(
-                    text="1",
-                    link="/1",
-                    type="item",
-                    icon="assessment",
-                ),
-                DashboardLink(
-                    text="2",
-                    link="/2",
-                    type="item",
-                    icon="assessment",
-                ),
-            ],
-        ),
-    )
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_get_sidebar_items_from_config_with_valid_links(
-        self, harness, user_links_as_sidebar_items
-    ):
-        # Arrange
-        expected_links = user_links_as_sidebar_items
-        expected_links_dicts = [asdict(link) for link in expected_links]
-
-        harness.update_config({ADDITIONAL_MENU_LINKS_CONFIG: yaml.dump(expected_links_dicts)})
-        harness.begin()
-
-        # Act
-        actual_links = harness.charm._get_sidebar_items_from_config()
-
-        # Assert
-        assert actual_links == expected_links
-
-    @pytest.mark.parametrize(
-        "user_links_as_sidebar_items",
-        (
-            [],  # Empty config
-            [
-                DashboardLink(
-                    text="1",
-                    link="/1",
-                    type="item",
-                    icon="assessment",
-                ),
-                DashboardLink(
-                    text="2",
-                    link="/2",
-                    type="item",
-                    icon="assessment",
-                ),
-            ],
-        ),
-    )
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_get_sidebar_items_from_config_as_json_with_valid_links(
-        self, harness, user_links_as_sidebar_items
-    ):
-        # Arrange
-        expected_links = user_links_as_sidebar_items
-        expected_links_dicts = [asdict(link) for link in expected_links]
-
-        harness.update_config({ADDITIONAL_MENU_LINKS_CONFIG: json.dumps(expected_links_dicts)})
-        harness.begin()
-
-        # Act
-        actual_links = harness.charm._get_sidebar_items_from_config()
-
-        # Assert
-        assert actual_links == expected_links
-
-    @pytest.mark.parametrize(
-        "config_yaml",
-        (
-            "[malformed yaml",
-            '[{"correct yaml with incomplete sidebar item dicts": "x"}]',
-        ),
-    )
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_get_sidebar_items_from_config_with_bad_input(self, harness, config_yaml):
-        # Arrange
-        harness.update_config({ADDITIONAL_MENU_LINKS_CONFIG: config_yaml})
-        harness.begin()
-
-        harness.charm.logger = MagicMock()
-
-        # Act/Assert
-        actual_links = harness.charm._get_sidebar_items_from_config()
-
-        # Assert
-        # No links are parsed
-        assert actual_links == []
-
-        # Warning sent to logger
-        assert harness.charm.logger.warning.call_count == 1
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_sidebar_relation_and_config_and_ordering_together(
@@ -461,7 +361,7 @@ class TestSidebarLinks:
 
         # Act
         actual_items = [
-            DashboardLink(**item) for item in json.loads(harness.charm._context["links"])
+            DashboardLink(**item) for item in json.loads(harness.charm._context["menuLinks"])
         ]
 
         # Assert
@@ -481,164 +381,9 @@ class TestSidebarLinks:
         # Assert
         # Should include both relation- and config-based items, ordered as set in config
         actual_items = [
-            DashboardLink(**item) for item in json.loads(harness.charm._context["links"])
+            DashboardLink(**item) for item in json.loads(harness.charm._context["menuLinks"])
         ]
         assert actual_items == expected_sidebar_items_ordered
-
-    @pytest.mark.parametrize(
-        "sidebar_items, preferred_link_text, expected_result",
-        [
-            ([], ["some stuff"], []),  # Case where we have null input/output
-            # Case where we have empty reorder, so nothing should change
-            (
-                [
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="2",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-                [],
-                [
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="2",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-            ),
-            # Case where we have links that should be reordered
-            (
-                [
-                    DashboardLink(
-                        text="3",
-                        link="/3",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="2",
-                        link="/2",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-                ("2", "3"),
-                [
-                    DashboardLink(
-                        text="2",
-                        link="/2",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="3",
-                        link="/3",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-            ),
-            # Case where we have multiple links with the same text
-            (
-                [
-                    DashboardLink(
-                        text="3",
-                        link="/3",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1b",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="3",
-                        link="/3b",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="2",
-                        link="/2",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-                ("2", "3"),
-                [
-                    DashboardLink(
-                        text="2",
-                        link="/2",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="3",
-                        link="/3",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="3",
-                        link="/3b",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1",
-                        type="item",
-                        icon="assessment",
-                    ),
-                    DashboardLink(
-                        text="1",
-                        link="/1b",
-                        type="item",
-                        icon="assessment",
-                    ),
-                ],
-            ),
-        ],
-    )
-    def test_sort_sidebar_items(self, sidebar_items, preferred_link_text, expected_result):
-        """Tests that sort_sidebar_items works as expected."""
-        actual_sorted_items = sort_sidebar_items(sidebar_items, preferred_link_text)
-        assert actual_sorted_items == expected_result
 
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
