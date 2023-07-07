@@ -99,7 +99,7 @@ class KubeflowDashboardOperator(CharmBase):
     def _context(self) -> dict:
         """Returns the context used to create Kubernetes resources."""
         menu_links_as_json = aggregate_links_as_json(
-            links_from_relation=self.dashboard_link_provider.get_dashboard_links(),
+            links_from_relation=self.dashboard_link_provider.get_dashboard_links(location='menu'),
             additional_link_config=self.model.config[ADDITIONAL_MENU_LINKS_CONFIG],
             link_order_config=self.model.config[MENU_LINKS_ORDER_CONFIG],
         )

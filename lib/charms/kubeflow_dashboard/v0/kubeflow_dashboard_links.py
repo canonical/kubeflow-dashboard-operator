@@ -97,11 +97,12 @@ class DashboardLink:
         location: Link's location on the dashboard.  One of `sidebar`, `sidebar_external`, `quick`,
                   and `documentation`.
     """
+
     text: str
     link: str
     type: str  # noqa: A003
     icon: str
-    # location: str  # To be implemented
+    location: str
 
 
 class KubeflowDashboardLinksUpdatedEvent(RelationEvent):
@@ -116,6 +117,7 @@ class KubeflowDashboardLinksEvents(ObjectEvents):
 
 class KubeflowDashboardLinksProvider(Object):
     """Relation manager for the Provider side of the Kubeflow Dashboard Sidebar relation.."""
+
     on = KubeflowDashboardLinksEvents()
 
     def __init__(
@@ -164,13 +166,16 @@ class KubeflowDashboardLinksProvider(Object):
             for evt in refresh_event:
                 self.framework.observe(evt, self._on_relation_changed)
 
-    def get_dashboard_links(self, omit_breaking_app: bool = True) -> List[DashboardLink]:
+    def get_dashboard_links(
+        self, omit_breaking_app: bool = True, location: Optional[str] = None
+    ) -> List[DashboardLink]:
         """Returns a list of all DashboardItems from related Applications.
 
         Args:
             omit_breaking_app: If True and this is called during a link-relation-broken event,
                                the remote app's data will be omitted.  For more context, see:
                                https://github.com/canonical/kubeflow-dashboard-operator/issues/124
+            location: If specified, return only links with this location.  Else, returns all links.
 
         Returns:
             List of DashboardLinks defining the dashboard links for all related applications.
@@ -199,20 +204,32 @@ class KubeflowDashboardLinksProvider(Object):
             dict_data = json.loads(json_data)
             dashboard_links.extend([DashboardLink(**item) for item in dict_data])
 
+        if location is not None:
+            dashboard_links = [
+                dashboard_link
+                for dashboard_link in dashboard_links
+                if dashboard_link.location == location
+            ]
+
         return dashboard_links
 
-    def get_dashboard_links_as_json(self, omit_breaking_app: bool = True) -> str:
+    def get_dashboard_links_as_json(
+        self, omit_breaking_app: bool = True, location: Optional[str] = None
+    ) -> str:
         """Returns a JSON string of all DashboardItems from related Applications.
 
         Args:
             omit_breaking_app: If True and this is called during a links-relation-broken event,
                                the remote app's data will be omitted.  For more context, see:
                                https://github.com/canonical/kubeflow-dashboard-operator/issues/124
+            location: If specified, return only links with this location.  Else, returns all links.
 
         Returns:
             JSON string of all DashboardLinks for all related applications, each as dicts.
         """
-        return dashboard_links_to_json(self.get_dashboard_links(omit_breaking_app=omit_breaking_app))
+        return dashboard_links_to_json(
+            self.get_dashboard_links(omit_breaking_app=omit_breaking_app)
+        )
 
     def _on_relation_changed(self, event):
         """Handler for relation-changed event for this relation."""
@@ -225,6 +242,7 @@ class KubeflowDashboardLinksProvider(Object):
 
 class KubeflowDashboardLinksRequirer(Object):
     """Relation manager for the Requirer side of the Kubeflow Dashboard Links relation."""
+
     def __init__(
         self,
         charm: CharmBase,
@@ -314,6 +332,4 @@ def get_name_of_breaking_app(relation_name: str) -> Optional[str]:
 
 def dashboard_links_to_json(dashboard_links: List[DashboardLink]) -> str:
     """Returns a list of SidebarItems as a JSON string."""
-    return json.dumps(
-        [asdict(dashboard_link) for dashboard_link in dashboard_links]
-    )
+    return json.dumps([asdict(dashboard_link) for dashboard_link in dashboard_links])

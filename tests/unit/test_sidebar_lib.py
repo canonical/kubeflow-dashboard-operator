@@ -28,7 +28,9 @@ requires:
     interface: kubeflow_dashboard_sidebar
 """
 REQUIRER_DASHBOARD_LINKS = [
-    DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+    DashboardLink(
+        text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}", location="menu"
+    )
     for i in range(3)
 ]
 
@@ -56,18 +58,24 @@ class DummyRequirerCharm(CharmBase):
 
 
 class TestProvider:
-    def test_get_sidebar_items(self):
-        """Tests that get_sidebar_items correctly returns information from the relation."""
+    def test_get_dashboard_links(self):
+        """Tests that get_dashboard_links correctly returns information from the relation."""
         # Arrange
         # Set up charm
         other_app = "other"
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
-        # Create data
-        expected_sidebar_items_per_relation = [
-            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
-            for i in range(3)
-        ]
+        # Create data, including multiple location values
+        expected_sidebar_items_per_relation = (
+                [
+                    DashboardLink(text=f"text{i}-menu", link=f"link{i}-menu", type=f"type{i}-menu", icon=f"icon{i}-menu", location="menu")
+                    for i in range(3)
+                ] +
+                [
+                    DashboardLink(text=f"text{i}-documentation", link=f"link{i}-documentation", type=f"type{i}-documentation", icon=f"icon{i}-documentation", location="documentation")
+                    for i in range(3)
+                ]
+        )
         databag = {
             DASHBOARD_LINKS_FIELD: json.dumps(
                 [asdict(sidebar_item) for sidebar_item in expected_sidebar_items_per_relation]
@@ -97,7 +105,54 @@ class TestProvider:
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
 
-    def test_get_sidebar_items_from_empty_relation(self):
+    def test_get_dashboard_links_with_location(self):
+        """Tests that get_dashboard_links correctly returns links for the location specified."""
+        # Arrange
+        # Set up charm
+        other_app = "other"
+        harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
+
+        # Create data, including multiple location values
+        expected_dashboard_menu_links = [
+            DashboardLink(text=f"text{i}-menu", link=f"link{i}-menu", type=f"type{i}-menu", icon=f"icon{i}-menu", location="menu")
+            for i in range(3)
+                ]
+        other_dashboard_links = [
+            DashboardLink(text=f"text{i}-documentation", link=f"link{i}-documentation", type=f"type{i}-documentation", icon=f"icon{i}-documentation", location="documentation")
+            for i in range(3)
+        ]
+
+        databag = {
+            DASHBOARD_LINKS_FIELD: json.dumps(
+                [asdict(sidebar_item) for sidebar_item in expected_dashboard_menu_links + other_dashboard_links]
+            )
+        }
+
+        # Add data to relation
+        relation_id = harness.add_relation(RELATION_NAME, other_app)
+        harness.update_relation_data(
+            relation_id=relation_id, app_or_unit=other_app, key_values=databag
+        )
+
+        # Add to a second relation so we simulate having two relations of data
+        relation_id = harness.add_relation(RELATION_NAME, other_app)
+        harness.update_relation_data(
+            relation_id=relation_id, app_or_unit=other_app, key_values=databag
+        )
+
+        # Double the data, because each relation has some
+        expected_dashboard_menu_links = expected_dashboard_menu_links * 2
+
+        harness.begin()
+
+        # Act
+        # Get DashboardLinks from relation data for just one location
+        actual_dashboard_menu_links = harness.charm.sidebar_provider.get_dashboard_links(location="menu")
+
+        # Assert
+        assert actual_dashboard_menu_links == expected_dashboard_menu_links
+
+    def test_get_dashboard_links_from_empty_relation(self):
         """Tests that get_sidebar_items correctly handles empty relations."""
         # Arrange
         # Set up charm
@@ -118,7 +173,7 @@ class TestProvider:
         # Assert
         assert actual_sidebar_items == expected_sidebar_items
 
-    def test_get_sidebar_items_as_json(self):
+    def test_get_dashboard_links_as_json(self):
         """Tests that get_sidebar_items_as_json returns relation data correctly."""
         # Arrange
         # Set up charm
@@ -127,7 +182,7 @@ class TestProvider:
 
         # Create data
         expected_sidebar_items = [
-            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}")
+            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}", location="menu")
             for i in range(3)
         ]
         databag = {
@@ -162,7 +217,7 @@ class TestProvider:
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Create data
-        sidebar_item = DashboardLink(text="text", link="link", type="type", icon="icon")
+        sidebar_item = DashboardLink(text="text", link="link", type="type", icon="icon", location="menu")
         databag = {DASHBOARD_LINKS_FIELD: json.dumps([asdict(sidebar_item)])}
 
         harness.begin()
@@ -184,8 +239,8 @@ class TestProvider:
 
 
 class TestRequirer:
-    def test_send_sidebar_on_leader_elected(self):
-        """Test that the sidebar Requirer correctly handles the leader elected event."""
+    def test_send_dashboard_links_on_leader_elected(self):
+        """Test that the Requirer correctly handles the leader elected event."""
         # Arrange
         harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
         other_app = "provider"
@@ -208,8 +263,8 @@ class TestRequirer:
 
         assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
 
-    def test_send_sidebar_on_relation_created(self):
-        """Test that the sidebar Requirer correctly handles the relation created event."""
+    def test_send_dashboard_links_on_relation_created(self):
+        """Test that the Requirer correctly handles the relation created event."""
         # Arrange
         other_app = "provider"
         harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
@@ -226,7 +281,7 @@ class TestRequirer:
 
         assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
 
-    def test_send_sidebar_without_leadership(self):
+    def test_send_dashboard_links_without_leadership(self):
         """Tests whether library incorrectly sends sidebar data when unit is not leader."""
         # Arrange
         other_app = "provider"
