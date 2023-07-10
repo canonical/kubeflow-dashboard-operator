@@ -66,16 +66,25 @@ class TestProvider:
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Create data, including multiple location values
-        expected_sidebar_items_per_relation = (
-                [
-                    DashboardLink(text=f"text{i}-menu", link=f"link{i}-menu", type=f"type{i}-menu", icon=f"icon{i}-menu", location="menu")
-                    for i in range(3)
-                ] +
-                [
-                    DashboardLink(text=f"text{i}-documentation", link=f"link{i}-documentation", type=f"type{i}-documentation", icon=f"icon{i}-documentation", location="documentation")
-                    for i in range(3)
-                ]
-        )
+        expected_sidebar_items_per_relation = [
+            DashboardLink(
+                text=f"text{i}-menu",
+                link=f"link{i}-menu",
+                type=f"type{i}-menu",
+                icon=f"icon{i}-menu",
+                location="menu",
+            )
+            for i in range(3)
+        ] + [
+            DashboardLink(
+                text=f"text{i}-documentation",
+                link=f"link{i}-documentation",
+                type=f"type{i}-documentation",
+                icon=f"icon{i}-documentation",
+                location="documentation",
+            )
+            for i in range(3)
+        ]
         databag = {
             DASHBOARD_LINKS_FIELD: json.dumps(
                 [asdict(sidebar_item) for sidebar_item in expected_sidebar_items_per_relation]
@@ -114,17 +123,32 @@ class TestProvider:
 
         # Create data, including multiple location values
         expected_dashboard_menu_links = [
-            DashboardLink(text=f"text{i}-menu", link=f"link{i}-menu", type=f"type{i}-menu", icon=f"icon{i}-menu", location="menu")
+            DashboardLink(
+                text=f"text{i}-menu",
+                link=f"link{i}-menu",
+                type=f"type{i}-menu",
+                icon=f"icon{i}-menu",
+                location="menu",
+            )
             for i in range(3)
-                ]
+        ]
         other_dashboard_links = [
-            DashboardLink(text=f"text{i}-documentation", link=f"link{i}-documentation", type=f"type{i}-documentation", icon=f"icon{i}-documentation", location="documentation")
+            DashboardLink(
+                text=f"text{i}-documentation",
+                link=f"link{i}-documentation",
+                type=f"type{i}-documentation",
+                icon=f"icon{i}-documentation",
+                location="documentation",
+            )
             for i in range(3)
         ]
 
         databag = {
             DASHBOARD_LINKS_FIELD: json.dumps(
-                [asdict(sidebar_item) for sidebar_item in expected_dashboard_menu_links + other_dashboard_links]
+                [
+                    asdict(sidebar_item)
+                    for sidebar_item in expected_dashboard_menu_links + other_dashboard_links
+                ]
             )
         }
 
@@ -147,7 +171,9 @@ class TestProvider:
 
         # Act
         # Get DashboardLinks from relation data for just one location
-        actual_dashboard_menu_links = harness.charm.sidebar_provider.get_dashboard_links(location="menu")
+        actual_dashboard_menu_links = harness.charm.sidebar_provider.get_dashboard_links(
+            location="menu"
+        )
 
         # Assert
         assert actual_dashboard_menu_links == expected_dashboard_menu_links
@@ -182,7 +208,9 @@ class TestProvider:
 
         # Create data
         expected_sidebar_items = [
-            DashboardLink(text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}", location="menu")
+            DashboardLink(
+                text=f"text{i}", link=f"link{i}", type=f"type{i}", icon=f"icon{i}", location="menu"
+            )
             for i in range(3)
         ]
         databag = {
@@ -217,7 +245,9 @@ class TestProvider:
         harness = Harness(DummyProviderCharm, meta=DUMMY_PROVIDER_METADATA)
 
         # Create data
-        sidebar_item = DashboardLink(text="text", link="link", type="type", icon="icon", location="menu")
+        sidebar_item = DashboardLink(
+            text="text", link="link", type="type", icon="icon", location="menu"
+        )
         databag = {DASHBOARD_LINKS_FIELD: json.dumps([asdict(sidebar_item)])}
 
         harness.begin()

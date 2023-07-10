@@ -14,64 +14,70 @@ from dashboard_links import (
 
 
 @pytest.mark.parametrize(
-    "expected_links",
-    (
-        [],  # Empty config
-        [
-            DashboardLink(
-                text="1",
-                link="/1",
-                type="item",
-                icon="assessment",
-                location="menu",
-            ),
-            DashboardLink(
-                text="2",
-                link="/2",
-                type="item",
-                icon="assessment",
-                location="menu",
-            ),
-        ],
-    ),
+    "location, expected_links",
+    [
+        ("menu", []),  # Empty config
+        (
+            "menu",
+            [
+                DashboardLink(
+                    text="1",
+                    link="/1",
+                    type="item",
+                    icon="assessment",
+                    location="menu",
+                ),
+                DashboardLink(
+                    text="2",
+                    link="/2",
+                    type="item",
+                    icon="assessment",
+                    location="menu",
+                ),
+            ],
+        ),
+    ],
 )
-def test_parse_dashboard_link_config_with_valid_links(expected_links):
+def test_parse_dashboard_link_config_with_valid_links(location, expected_links):
     # Arrange
     expected_links_dicts = [asdict(link) for link in expected_links]
 
-    actual_links = parse_dashboard_link_config(yaml.dump(expected_links_dicts))
+    actual_links = parse_dashboard_link_config(yaml.dump(expected_links_dicts), location)
 
     # Assert
     assert actual_links == expected_links
 
 
 @pytest.mark.parametrize(
-    "expected_links",
-    (
-        [],  # Empty config
-        [
-            DashboardLink(
-                text="1",
-                link="/1",
-                type="item",
-                icon="assessment",
-                location="menu",
-            ),
-            DashboardLink(
-                text="2",
-                link="/2",
-                type="item",
-                icon="assessment",
-                location="menu",
-            ),
-        ],
-    ),
+    "location, expected_links",
+    [
+        ("menu", []),  # Empty config
+        (
+            "menu",
+            [
+                DashboardLink(
+                    text="1",
+                    link="/1",
+                    type="item",
+                    icon="assessment",
+                    location="menu",
+                ),
+                DashboardLink(
+                    text="2",
+                    link="/2",
+                    type="item",
+                    icon="assessment",
+                    location="menu",
+                ),
+            ],
+        ),
+    ],
 )
-def test_parse_dashboard_link_config_with_valid_links_as_json(expected_links):
+def test_parse_dashboard_link_config_with_valid_links_as_json(location, expected_links):
     # Arrange
     expected_links_dicts = [asdict(link) for link in expected_links]
 
-    actual_links = parse_dashboard_link_config(json.dumps(expected_links_dicts))
+    actual_links = parse_dashboard_link_config(json.dumps(expected_links_dicts), location)
 
     # Assert
     assert actual_links == expected_links
@@ -85,7 +91,7 @@ def test_parse_dashboard_link_config_with_valid_links_as_json(expected_links):
     ),
 )
 def test_parse_dashboard_link_config_with_invalid_links(config_yaml, caplog):
-    actual_links = parse_dashboard_link_config(config_yaml)
+    actual_links = parse_dashboard_link_config(config_yaml, location="menu")
 
     assert actual_links == []
     assert len(caplog.records) == 1
@@ -271,7 +277,7 @@ def test_sort_dashboard_links(dashboard_links, preferred_link_order, expected_re
 
 
 @pytest.mark.parametrize(
-    "links_from_relation, additional_link_config, link_order_config, expected_aggregated_links",
+    "links_from_relation, additional_link_config, link_order_config, location, expected_aggregated_links",  # noqa
     (
         (
             # Empty case
@@ -279,6 +285,7 @@ def test_sort_dashboard_links(dashboard_links, preferred_link_order, expected_re
                 [],
                 "",
                 "",
+                "menu",
                 [],
             ),
             # Case where we have links that should be reordered
@@ -322,6 +329,7 @@ def test_sort_dashboard_links(dashboard_links, preferred_link_order, expected_re
                 # link_order_config
                 yaml.dump(["2", "4"]),
                 # expected_aggregated_links
+                "menu",
                 [
                     DashboardLink(
                         text="2",
@@ -357,16 +365,20 @@ def test_sort_dashboard_links(dashboard_links, preferred_link_order, expected_re
     ),
 )
 def test_aggregate_links(
-    links_from_relation, additional_link_config, link_order_config, expected_aggregated_links
+    links_from_relation,
+    additional_link_config,
+    link_order_config,
+    location,
+    expected_aggregated_links,
 ):
     actual_aggregated_links = aggregate_links(
-        links_from_relation, additional_link_config, link_order_config
+        links_from_relation, additional_link_config, link_order_config, location
     )
     assert actual_aggregated_links == expected_aggregated_links
 
 
 @pytest.mark.parametrize(
-    "dashboard_links, expected_json",
+    "dashboard_links, location, expected_json",
     [
         [
             [
@@ -376,8 +388,10 @@ def test_aggregate_links(
                     type="item",
                     icon="assessment",
                     location="menu",
+                    desc="desc",
                 ),
             ],
+            "menu",
             json.dumps(
                 [
                     {
@@ -386,17 +400,23 @@ def test_aggregate_links(
                         "type": "item",
                         "icon": "assessment",
                         "location": "menu",
+                        "desc": "desc",
                     }
                 ]
             ),
         ],
         [
             [],
+            "menu",
             json.dumps([]),
         ],
     ],
 )
-def test_aggregate_links_as_json(dashboard_links, expected_json):
-    actual_json = aggregate_links_as_json(dashboard_links, "", "")
+def test_aggregate_links_as_json(dashboard_links, location, expected_json):
+    actual_json = aggregate_links_as_json(dashboard_links, "", "", location)
 
-    assert actual_json == expected_json
+    # Interpret the JSON as python object to ignore ordering differences
+    actual = json.loads(actual_json)
+    expected = json.loads(expected_json)
+
+    assert actual == expected

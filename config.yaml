@@ -4,16 +4,28 @@
 options:
   additional-menu-links:
     type: string
-    default: ""
+    default: ''
     description: >
-      YAML or JSON formatted string that is a list of Kubeflow Dashboard sidebar items that will be added to the 
-      dashboards left hand sidebar.  Each entry should be formatted like: 
-      {text: <string>, link: <string>, type: item, icon: <string>}.  For example: 
-      '[{text: Another runs, link: /runs, type: item, icon: assessment}]'.
-      This is typically easiest to configure from a file - define a YAML or JSON file, then pass to Juju via
-      `juju config kubeflow-dashboard additional-menu-links=@myfile.yaml`.
-      See [upstream docs](https://www.kubeflow.org/docs/components/central-dash/customizing-menu/) for more details on
-      the menu and link format.
+      YAML or JSON formatted input defining additional menu links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-external-links:
+    type: string
+    default: ''
+    description: >
+      YAML or JSON formatted input defining additional external links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-quick-links:
+    type: string
+    default: '[]'
+    description: >
+      YAML or JSON formatted input defining additional quick links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-documentation-links:
+    type: string
+    default: '[{"text":"Getting started with Charmed Kubeflow","desc":"Learn how to get started with Kubeflow","link":"https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow"},{"text":"Microk8s for Kubeflow","desc":"Quickly get Kubeflow running locally on native hypervisors","link":"https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-"},{"text":"Requirements for Kubeflow","desc":"Get more detailed information about using Kubeflow and its components","link":"https://www.kubeflow.org/docs/started/requirements/"}]'
+    description: >
+      YAML or JSON formatted input defining additional documentation links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
   dashboard-configmap:
     type: string
     default: centraldashboard-config
@@ -29,6 +41,24 @@ options:
   menu-link-order:
     type: string
     default: '["Notebooks", "Experiments (AutoML)", "Experiments (KFP)", "Pipelines", "Runs", "Recurring Runs", "Volumes", "Tensorboards"]'
-    description: > 
-      YAML or JSON list of strings defining the order of the links in the dashboard sidebar.  The format is:
-      '["text of first link", "text of second link", "text of third link", ...]'.  See README.md for usage instructions.
+    description: >
+      YAML or JSON formatted list of strings defining the order of the menu links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  external-link-order:
+    type: string
+    default: '["MLflow"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the external links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  quick-link-order:
+    type: string
+    default: '["Upload a pipeline","View all pipeline runs","Create a new Notebook server","View Katib Experiments"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the quick links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  documentation-link-order:
+    type: string
+    default: '["Getting started with Charmed Kubeflow","Microk8s for Kubeflow","Requirements for Kubeflow"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the documentation links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.

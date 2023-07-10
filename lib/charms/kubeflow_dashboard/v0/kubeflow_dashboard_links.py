@@ -78,6 +78,7 @@ LIBAPI = 0
 LIBPATCH = 2
 
 
+DASHBOARD_LINK_LOCATIONS = ['menu', 'external', 'quick', 'documentation']
 DASHBOARD_LINKS_FIELD = "dashboard_links"
 
 
@@ -89,8 +90,8 @@ class DashboardLink:
 
     Args:
         text: The text shown for the link
-        link: The link (a relative link for `location=sidebar` or `location=quick`, eg: `/mlflow`, or a full URL for
-              other locations, eg: http://my-website.com)
+        link: The link (a relative link for `location=sidebar` or `location=quick`, eg: `/mlflow`,
+              or a full URL for other locations, eg: http://my-website.com)
         type: A type of sidebar entry (typically, "item")
         icon: An icon for the link, from
               https://kevingleason.me/Polymer-Todo/bower_components/iron-icons/demo/index.html
@@ -100,9 +101,10 @@ class DashboardLink:
 
     text: str
     link: str
-    type: str  # noqa: A003
-    icon: str
     location: str
+    icon: str = "icons:link"
+    type: str = "item"  # noqa: A003
+    desc: str = ""
 
 
 class KubeflowDashboardLinksUpdatedEvent(RelationEvent):

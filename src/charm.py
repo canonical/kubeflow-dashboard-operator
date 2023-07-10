@@ -8,7 +8,10 @@ import logging
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import KubeflowDashboardLinksProvider
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
+    DASHBOARD_LINK_LOCATIONS,
+    KubeflowDashboardLinksProvider,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -21,13 +24,19 @@ from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, ge
 
 from dashboard_links import aggregate_links_as_json
 
-ADDITIONAL_MENU_LINKS_CONFIG = "additional-menu-links"
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
-MENU_LINKS_ORDER_CONFIG = "menu-link-order"
+
 DASHBOARD_LINKS_RELATION_NAME = "links"
+# Map of location to the config field names for that location
+ADDITIONAL_LINKS_CONFIG_NAME = {
+    location: f"additional-{location}-links" for location in DASHBOARD_LINK_LOCATIONS
+}
+EXTERNAL_LINKS_ORDER_CONFIG_NAME = {
+    location: f"{location}-link-order" for location in DASHBOARD_LINK_LOCATIONS
+}
 
 
 class CheckFailed(Exception):
@@ -98,17 +107,16 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def _context(self) -> dict:
         """Returns the context used to create Kubernetes resources."""
-        menu_links_as_json = aggregate_links_as_json(
-            links_from_relation=self.dashboard_link_provider.get_dashboard_links(location='menu'),
-            additional_link_config=self.model.config[ADDITIONAL_MENU_LINKS_CONFIG],
-            link_order_config=self.model.config[MENU_LINKS_ORDER_CONFIG],
-        )
+        links = self._get_dashboard_links()
 
         return {
             "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self._configmap_name,
-            "menuLinks": menu_links_as_json,
+            "menuLinks": links["menu"],
+            "externalLinks": links["external"],
+            "quickLinks": links["quick"],
+            "documentationItems": links["documentation"],
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
 
@@ -237,6 +245,19 @@ class KubeflowDashboardOperator(CharmBase):
         except ApiError as e:
             raise GenericCharmRuntimeError("Failed to create K8S resources") from e
         self.model.unit.status = ActiveStatus()
+
+    def _get_dashboard_links(self):
+        links = {}
+        for location in DASHBOARD_LINK_LOCATIONS:
+            links[location] = aggregate_links_as_json(
+                links_from_relation=self.dashboard_link_provider.get_dashboard_links(
+                    location=location
+                ),
+                additional_link_config=self.model.config[ADDITIONAL_LINKS_CONFIG_NAME[location]],
+                link_order_config=self.model.config[EXTERNAL_LINKS_ORDER_CONFIG_NAME[location]],
+                location=location,
+            )
+        return links
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]

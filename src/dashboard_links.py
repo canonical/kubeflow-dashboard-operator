@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def aggregate_links(
-    links_from_relation: List[DashboardLink], additional_link_config: str, link_order_config: str
+    links_from_relation: List[DashboardLink],
+    additional_link_config: str,
+    link_order_config: str,
+    location: str,
 ):
     """Returns an aggregation of DashboardLinks from relations and Juju config.
 
@@ -25,11 +28,12 @@ def aggregate_links(
                                 a `additional-*-links` charm config
         link_order_config: raw YAML string config for link ordering, typically from a
                            `*-link-order` charm config field
+        location: the DashboardLink location
 
     Returns:
         List of DashboardLink objects, with the links called out in link_order_config on the top.
     """
-    links_from_config = parse_dashboard_link_config(additional_link_config)
+    links_from_config = parse_dashboard_link_config(additional_link_config, location)
     preferred_link_order = parse_dashboard_link_order(link_order_config)
 
     all_links = links_from_relation + links_from_config
@@ -38,7 +42,7 @@ def aggregate_links(
 
 
 def aggregate_links_as_json(
-    links_from_relation, additional_link_config: str, link_order_config: str
+    links_from_relation, additional_link_config: str, link_order_config: str, location: str
 ) -> str:
     """Returns an aggregation of DashboardLinks from relations and Juju config, as json.
 
@@ -54,14 +58,17 @@ def aggregate_links_as_json(
         List of DashboardLink objects, with the links called out in link_order_config on the top.
     """
     return dashboard_links_to_json(
-        aggregate_links(links_from_relation, additional_link_config, link_order_config)
+        aggregate_links(links_from_relation, additional_link_config, link_order_config, location)
     )
 
 
-def parse_dashboard_link_config(config: str):
+def parse_dashboard_link_config(config: str, location: str):
     """Parses the raw data from an additional-*-links config field, returning DashboardItems.
 
     If there are errors in parsing the config, this returns an empty list and logs a warning.
+
+    The .location of the returned DashboardItems is always the same as the location provided
+    as input, even if the config JSON specified a different value.
     """
     error_message = (
         f"Cannot parse a config-defined dashboard link from config '{config}' - this"
@@ -76,6 +83,10 @@ def parse_dashboard_link_config(config: str):
     except yaml.YAMLError as err:
         logger.warning(f"{error_message}  Got error: {err}")
         return []
+
+    # Update the location field, overwriting the existing value if it exists
+    for link in links:
+        link["location"] = location
 
     try:
         links = [DashboardLink(**item) for item in links]

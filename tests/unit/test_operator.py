@@ -19,9 +19,9 @@ from ops.pebble import ChangeError
 from ops.testing import Harness
 
 from charm import (
-    ADDITIONAL_MENU_LINKS_CONFIG,
+    ADDITIONAL_LINKS_CONFIG_NAME,
     DASHBOARD_LINKS_RELATION_NAME,
-    MENU_LINKS_ORDER_CONFIG,
+    EXTERNAL_LINKS_ORDER_CONFIG_NAME,
     KubeflowDashboardOperator,
 )
 
@@ -351,7 +351,7 @@ class TestSidebarLinks:
         ]
         config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
         harness.update_config(
-            {ADDITIONAL_MENU_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)}
+            {ADDITIONAL_LINKS_CONFIG_NAME["menu"]: yaml.dump(config_sidebar_items_as_dicts)}
         )
 
         expected_sidebar_items = relation_data["sidebar_items"] + config_sidebar_items
@@ -371,7 +371,9 @@ class TestSidebarLinks:
 
         # Reorder the items via config
         preferred_links = ["text-user-1", "text-relation1-2"]  # the user-config link,
-        harness.update_config({MENU_LINKS_ORDER_CONFIG: yaml.dump(preferred_links)})
+        harness.update_config(
+            {EXTERNAL_LINKS_ORDER_CONFIG_NAME["menu"]: yaml.dump(preferred_links)}
+        )
 
         expected_sidebar_items_ordered = [
             config_sidebar_items[0],
