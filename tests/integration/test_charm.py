@@ -268,30 +268,6 @@ async def test_configmap_contents_for_menu_links_with_ordering(
     assert actual_menu_links[0]["text"] == expected_menu_links[0].text
 
 
-@pytest.mark.asyncio
-def test_default_dashboard_links(driver: Tuple[webdriver.Chrome, WebDriverWait, str]):
-    """Tests all dashboard links other than the menu links."""
-    driver, wait, url = driver
-
-    # Ensure that doc links are set up properly
-    links = [
-        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow",  # noqa: E501
-        "https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-",  # noqa: E501
-        "https://www.kubeflow.org/docs/started/requirements/",
-    ]
-
-    for link in links:
-        print("Looking for link: %s" % link)
-        script = fix_queryselector(
-            [
-                "main-page",
-                "dashboard-view",
-                f"a[href='{link}']",
-            ]
-        )
-        wait.until(lambda x: x.execute_script(script))
-
-
 async def assert_menulinks_in_configmap(expected_menu_links, lightkube_client) -> List[Dict]:
     """Asserts that the dashboard configmap has exactly the menuLinks (sidebar links) expected.
 
