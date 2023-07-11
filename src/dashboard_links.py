@@ -16,6 +16,19 @@ logger = logging.getLogger(__name__)
 def aggregate_links(
     links_from_relation: List[DashboardLink], additional_link_config: str, link_order_config: str
 ):
+    """Returns an aggregation of DashboardLinks from relations and Juju config.
+
+    Args:
+        links_from_relation: List of DashboardLinks, typically those coming from the `links`
+                             relations
+        additional_link_config: raw YAML string config for additional links, typically from
+                                a `additional-*-links` charm config
+        link_order_config: raw YAML string config for link ordering, typically from a
+                           `*-link-order` charm config field
+
+    Returns:
+        List of DashboardLink objects, with the links called out in link_order_config on the top.
+    """
     links_from_config = parse_dashboard_link_config(additional_link_config)
     preferred_link_order = parse_dashboard_link_order(link_order_config)
 
@@ -27,6 +40,19 @@ def aggregate_links(
 def aggregate_links_as_json(
     links_from_relation, additional_link_config: str, link_order_config: str
 ) -> str:
+    """Returns an aggregation of DashboardLinks from relations and Juju config, as json.
+
+    Args:
+        links_from_relation: List of DashboardLinks, typically those coming from the `links`
+                             relations
+        additional_link_config: raw YAML string config for additional links, typically from
+                                a `additional-*-links` charm config
+        link_order_config: raw YAML string config for link ordering, typically from a
+                           `*-link-order` charm config field
+
+    Returns:
+        List of DashboardLink objects, with the links called out in link_order_config on the top.
+    """
     return dashboard_links_to_json(
         aggregate_links(links_from_relation, additional_link_config, link_order_config)
     )
