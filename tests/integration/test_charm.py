@@ -5,23 +5,21 @@ import json
 import shutil
 from dataclasses import asdict
 from pathlib import Path
-from time import sleep
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import pytest
 import pytest_asyncio
 import yaml
-from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import DashboardLink
-from dashboard_links_requirer_tester_charm.src.charm import generate_menu_links
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
+    DASHBOARD_LINK_LOCATIONS,
+    DashboardLink,
+)
+from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
-from selenium import webdriver
-from selenium.common.exceptions import JavascriptException, WebDriverException
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
 
-from charm import ADDITIONAL_MENU_LINKS_CONFIG, MENU_LINKS_ORDER_CONFIG
+from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
@@ -33,6 +31,12 @@ DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
+
+DEFAULT_DOCUMENTATION_TEXTS = [
+    "Getting started with Charmed Kubeflow",
+    "Microk8s for Kubeflow",
+    "Requirements for Kubeflow",
+]
 
 
 @pytest.fixture(scope="module")
@@ -47,53 +51,6 @@ def copy_libraries_into_tester_charm() -> None:
 async def lightkube_client():
     lightkube_client = Client(field_manager="test")
     yield lightkube_client
-
-
-@pytest_asyncio.fixture
-async def driver(ops_test: OpsTest) -> Tuple[webdriver.Chrome, WebDriverWait, str]:
-    tmp = await ops_test.run(
-        "juju",
-        "status",
-        "-m",
-        ops_test.model_name,
-        "--format=yaml",
-    )
-    status = yaml.safe_load(tmp[1])
-    address = status["applications"][CHARM_NAME]["address"]
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
-    port = config["port"]["value"]
-    url = f"http://{address}.nip.io:{port}/"
-    options = Options()
-    options.headless = True
-
-    with webdriver.Chrome(options=options) as driver:
-        driver.delete_all_cookies()
-        wait = WebDriverWait(driver, 20, 1, (JavascriptException, StopIteration))
-        for _ in range(60):
-            try:
-                driver.get(url)
-                break
-            except WebDriverException:
-                sleep(5)
-        else:
-            driver.get(url)
-
-        yield driver, wait, url
-
-        driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
-
-
-def fix_queryselector(elems):
-    """Workaround for web components breaking querySelector.
-    Because someone thought it was a good idea to just yeet the moral equivalent
-    of iframes everywhere over a single page 🤦
-    Shadow DOM was a terrible idea and everyone involved should feel professionally
-    ashamed of themselves. Every problem it tried to solved could and should have
-    been solved in better ways that don't break the DOM.
-    """
-
-    selectors = '").shadowRoot.querySelector("'.join(elems)
-    return 'return document.querySelector("' + selectors + '")'
 
 
 @pytest.mark.asyncio
@@ -134,39 +91,64 @@ async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
-@pytest.mark.asyncio
-async def test_configmap_contents_no_relations_or_config(lightkube_client: Client):
-    """Tests the contents of the dashboard link configmap when no relations are present."""
-    expected_links = []
-    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    links = json.loads(configmap.data["links"])["menuLinks"]
-    assert links == expected_links
+@pytest.mark.parametrize(
+    "location, default_link_texts",
+    [
+        ("menu", [""]),
+        ("external", [""]),
+        ("quick", [""]),
+        ("documentation", DEFAULT_DOCUMENTATION_TEXTS),
+    ],
+)
+def test_configmap_contents_no_relations_or_config(
+    lightkube_client: Client, location, default_link_texts
+):
+    """Tests the dashboard links before any relations or additional config.
+
+    If this test failed, then likely the default links for one or more location have changed.  If
+    this was desired, update this test.  Otherwise, fix the bug that removed them.
+    """
+    dummy_dashbaord_links = [
+        DashboardLink(text=text, link="", location=location, icon="", type="", desc="")
+        for text in default_link_texts
+    ]
+    assert_links_in_configmap_by_text_value(
+        dummy_dashbaord_links, lightkube_client, location=location
+    )
 
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard link configmap when relations are present.
+    """Tests the contents of the dashboard link configmap after relations are added.
 
     This test uses ./tests/integration/dashboard_links_requirer_tester_charm, a mocker charm for the
     requirer side of the relation.  That charm is a simple charm that implements the Requirer side
-    of the dashboard lib in a predictable way.
+    of the dashboard lib in a predictable way, providing the links requested for each location.
     """
-    tester1 = f"{TESTER_CHARM_NAME}1"
-    tester2 = f"{TESTER_CHARM_NAME}2"
     charm = await ops_test.build_charm("./tests/integration/dashboard_links_requirer_tester_charm")
-    await ops_test.model.deploy(charm, application_name=tester1)
 
-    await ops_test.model.deploy(charm, application_name=tester2)
+    # Get the number of links for each group before, so we can confirm we didn't remove them later.
+    starting_n_links = {
+        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        for location in DASHBOARD_LINK_LOCATIONS
+    }
 
-    await ops_test.model.relate(CHARM_NAME, tester1)
-    await ops_test.model.relate(CHARM_NAME, tester2)
+    expected_links = {name: [] for name in DASHBOARD_LINK_LOCATIONS}
 
-    expected_menu_links = [
-        *generate_menu_links(tester1),
-        *generate_menu_links(tester2),
-    ]
+    for tester_suffix in ["1", "2"]:
+        tester = f"{TESTER_CHARM_NAME}{tester_suffix}"
+        await ops_test.model.deploy(charm, application_name=tester)
+        for location in ["menu", "documentation"]:
+            link_texts = [location]
+            these_links = generate_links_for_location(tester, texts=link_texts, location=location)
+            await ops_test.model.applications[tester].set_config(
+                {f"{location}_link_texts": yaml.dump(link_texts)}
+            )
+            expected_links[location].extend(these_links)
+
+        await ops_test.model.relate(CHARM_NAME, tester)
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
@@ -176,43 +158,71 @@ async def test_configmap_contents_with_relations(
         timeout=150,
     )
 
-    await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
+    for location in DASHBOARD_LINK_LOCATIONS:
+        links = await assert_links_in_configmap_by_text_value(
+            expected_links[location], lightkube_client, location=location, assert_exact=False
+        )
+        assert len(links) == starting_n_links[location] + len(expected_links[location])
 
 
 @pytest.mark.asyncio
 async def test_configmap_contents_with_menu_links_from_config(
     ops_test: OpsTest, lightkube_client: Client
 ):
-    """Tests the contents of the dashboard menu link configmap when user-driven links added."""
+    """Tests adding dashboard links via user config.
+
+    Tests only menu and documentation, as the implementation for all locations is the same.
+    """
     # Arrange
-    # Add config and check if we get additional menu links
-    config_menu_links = [
-        DashboardLink(
-            text="1",
-            link="/1",
-            type="item",
-            icon="assessment",
-        ),
-        DashboardLink(
-            text="2",
-            link="/2",
-            type="item",
-            icon="assessment",
-        ),
-    ]
+    # Remove any existing links from config before the test (it simplifies predicting the outcome
+    # of the test)
+    for location in ["menu", "documentation"]:
+        await ops_test.model.applications[CHARM_NAME].set_config(
+            {ADDITIONAL_LINKS_CONFIG_NAME[location]: ""}
+        )
 
-    config_menu_links_as_dicts = [asdict(link) for link in config_menu_links]
-
-    expected_menu_links = [
-        *config_menu_links,
-        *generate_menu_links(f"{TESTER_CHARM_NAME}1"),
-        *generate_menu_links(f"{TESTER_CHARM_NAME}2"),
-    ]
-
-    # Act
-    await ops_test.model.applications[CHARM_NAME].set_config(
-        {ADDITIONAL_MENU_LINKS_CONFIG: yaml.dump(config_menu_links_as_dicts)}
+    # Wait for everything to settle
+    await ops_test.model.wait_for_idle(
+        raise_on_error=True,
+        raise_on_blocked=True,
+        status="active",
+        timeout=150,
     )
+
+    # Get the number of links for each group before adding config, so we can confirm we didn't
+    # remove any preexisting links from other sources at the end of the test.
+    starting_n_links = {
+        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        for location in DASHBOARD_LINK_LOCATIONS
+    }
+
+    # Add config and check if we get additional menu links
+    expected_links = {name: [] for name in DASHBOARD_LINK_LOCATIONS}
+
+    for location in ["menu", "documentation"]:
+        config_links = [
+            DashboardLink(
+                text=f"{location}-config1",
+                link="/1",
+                type="item",
+                icon="assessment",
+                location=location,
+            ),
+            DashboardLink(
+                text=f"{location}-config2",
+                link="/2",
+                type="item",
+                icon="assessment",
+                location=location,
+            ),
+        ]
+
+        expected_links[location].extend(config_links)
+
+        config_links_as_dicts = [asdict(link) for link in config_links]
+        await ops_test.model.applications[CHARM_NAME].set_config(
+            {ADDITIONAL_LINKS_CONFIG_NAME[location]: yaml.dump(config_links_as_dicts)}
+        )
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
@@ -223,37 +233,37 @@ async def test_configmap_contents_with_menu_links_from_config(
     )
 
     # Assert
-    await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
+    for location in DASHBOARD_LINK_LOCATIONS:
+        links = await assert_links_in_configmap_by_text_value(
+            expected_links[location], lightkube_client, location=location, assert_exact=False
+        )
+        assert len(links) == starting_n_links[location] + len(
+            expected_links[location]
+        ), f"unexpected number of links at {location}"
 
 
 @pytest.mark.asyncio
-async def test_configmap_contents_for_menu_links_with_ordering(
-    ops_test: OpsTest, lightkube_client: Client
-):
-    """Tests that, if we add a menu link order, the configmap contents update as expected."""
-    # Move the user-driven link '2' from the previous test to the top of the list
-    menu_link_order = ["2"]
+async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
+    """Tests that, if we add a link order, the configmap contents update as expected.
 
-    expected_menu_links = [
-        DashboardLink(
-            text="2",
-            link="/2",
-            type="item",
-            icon="assessment",
-        ),
-        DashboardLink(
-            text="1",
-            link="/1",
-            type="item",
-            icon="assessment",
-        ),
-        *generate_menu_links(f"{TESTER_CHARM_NAME}1"),
-        *generate_menu_links(f"{TESTER_CHARM_NAME}2"),
-    ]
+    Tests only menu and documentation, as the implementation for all locations is the same.
+    """
+    # Get the number of links for each group before adding config, so we can confirm we didn't
+    # remove any preexisting links from other sources at the end of the test.
+    starting_n_links = {
+        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        for location in DASHBOARD_LINK_LOCATIONS
+    }
 
-    await ops_test.model.applications[CHARM_NAME].set_config(
-        {MENU_LINKS_ORDER_CONFIG: yaml.dump(menu_link_order)}
-    )
+    # Move the user-driven links '*2' from the previous test to the top of the list
+    # Test with both menu and documentation to confirm it works for different locations.
+    for location in ["menu", "documentation"]:
+
+        link_order = [f"{location}-config2"]
+
+        await ops_test.model.applications[CHARM_NAME].set_config(
+            {EXTERNAL_LINKS_ORDER_CONFIG_NAME[location]: yaml.dump(link_order)}
+        )
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
@@ -264,23 +274,45 @@ async def test_configmap_contents_for_menu_links_with_ordering(
     )
 
     # Assert
-    actual_menu_links = await assert_menulinks_in_configmap(expected_menu_links, lightkube_client)
-    assert actual_menu_links[0]["text"] == expected_menu_links[0].text
+    for location in DASHBOARD_LINK_LOCATIONS:
+        link_texts = await get_link_texts_from_configmap(lightkube_client, location)
+        assert len(link_texts) == starting_n_links[location]
+        if location in ["menu", "documentation"]:
+            assert link_texts[0] == f"{location}-config2"
 
 
-async def assert_menulinks_in_configmap(expected_menu_links, lightkube_client) -> List[Dict]:
-    """Asserts that the dashboard configmap has exactly the menuLinks (sidebar links) expected.
-
-    Returns the menu link data pulled from the configmap in case further processing is needed.
-    """
+async def get_link_texts_from_configmap(lightkube_client, location):
+    location_map = {
+        "menu": "menuLinks",
+        "external": "externalLinks",
+        "quick": "quickLinks",
+        "documentation": "documentationItems",
+    }
     configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
-    menu_links = json.loads(configmap.data["links"])["menuLinks"]
-    menu_links_text = [item["text"] for item in menu_links]
+    links = json.loads(configmap.data["links"])[location_map[location]]
+    actual_link_text = [item["text"] for item in links]
+    return actual_link_text
+
+
+async def assert_links_in_configmap_by_text_value(
+    expected_links, lightkube_client, location="menu", assert_exact=True
+) -> List[Dict]:
+    """Asserts that the dashboard configmap has the given link texts at this location.
+
+    Link text is used as a proxy for comparing the whole DashboardLink item.
+
+    Returns the link texts for this location in case further processing is needed.
+
+    If assert_exact=True, this asserts configmap must have exactly these links.  Else, we only
+    test that these links are in the configmap (aka, the configmap is a superset)
+    """
+    links_texts = await get_link_texts_from_configmap(lightkube_client, location)
     # Order is not guaranteed, so check that each is included individually
-    assert len(menu_links) == len(expected_menu_links)
-    for item in expected_menu_links:
+    if assert_exact:
+        assert len(links_texts) == len(expected_links)
+    for item in expected_links:
         # For some reason, comparing DashboardItems did not work here.  Comparing link texts
         # as an approximation.
-        assert item.text in menu_links_text
+        assert item.text in links_texts
 
-    return menu_links
+    return links_texts
