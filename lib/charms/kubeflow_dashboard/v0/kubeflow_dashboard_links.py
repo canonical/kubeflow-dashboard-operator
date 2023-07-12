@@ -68,14 +68,14 @@ from ops.framework import Object, ObjectEvents, EventSource, BoundEvent, EventBa
 logger = logging.getLogger(__name__)
 
 # The unique Charmhub library identifier, never change it
-LIBID = "a5795a88ee31458f9bc3ae026a04b89f"
+LIBID = "635fdbfc0fcc420882835d4c0086bb5d"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 1
 
 
 DASHBOARD_LINK_LOCATIONS = ['menu', 'external', 'quick', 'documentation']
@@ -123,10 +123,10 @@ class KubeflowDashboardLinksProvider(Object):
     on = KubeflowDashboardLinksEvents()
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str,
-        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+            self,
+            charm: CharmBase,
+            relation_name: str,
+            refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
         """Relation manager for the Provider side of the Kubeflow Dashboard Links relation.
 
@@ -169,7 +169,7 @@ class KubeflowDashboardLinksProvider(Object):
                 self.framework.observe(evt, self._on_relation_changed)
 
     def get_dashboard_links(
-        self, omit_breaking_app: bool = True, location: Optional[str] = None
+            self, omit_breaking_app: bool = True, location: Optional[str] = None
     ) -> List[DashboardLink]:
         """Returns a list of all DashboardItems from related Applications.
 
@@ -216,7 +216,7 @@ class KubeflowDashboardLinksProvider(Object):
         return dashboard_links
 
     def get_dashboard_links_as_json(
-        self, omit_breaking_app: bool = True, location: Optional[str] = None
+            self, omit_breaking_app: bool = True, location: Optional[str] = None
     ) -> str:
         """Returns a JSON string of all DashboardItems from related Applications.
 
@@ -246,11 +246,11 @@ class KubeflowDashboardLinksRequirer(Object):
     """Relation manager for the Requirer side of the Kubeflow Dashboard Links relation."""
 
     def __init__(
-        self,
-        charm: CharmBase,
-        relation_name: str,
-        dashboard_links: List[DashboardLink],
-        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+            self,
+            charm: CharmBase,
+            relation_name: str,
+            dashboard_links: List[DashboardLink],
+            refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
         """
         Relation manager for the Requirer side of the Kubeflow Dashboard Link relation.
