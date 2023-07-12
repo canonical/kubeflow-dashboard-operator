@@ -1,7 +1,9 @@
 import json
+from contextlib import nullcontext as does_not_raise
 from dataclasses import asdict
 from typing import List
 
+import pytest
 from ops.charm import CharmBase
 from ops.testing import Harness
 
@@ -55,6 +57,29 @@ class DummyRequirerCharm(CharmBase):
             relation_name=RELATION_NAME,
             dashboard_links=REQUIRER_DASHBOARD_LINKS,
         )
+
+
+class TestDashboardLink:
+    @pytest.mark.parametrize(
+        "location, context_raised",
+        [
+            ("menu", does_not_raise()),
+            ("menu", does_not_raise()),
+            ("menu", does_not_raise()),
+            ("menu", does_not_raise()),
+            ("invalid-location", pytest.raises(ValueError)),
+        ],
+    )
+    def test_location_validation(self, location, context_raised):
+        with context_raised:
+            DashboardLink(
+                text="",
+                link="",
+                location=location,
+                icon="",
+                type="",
+                desc="",
+            )
 
 
 class TestProvider:

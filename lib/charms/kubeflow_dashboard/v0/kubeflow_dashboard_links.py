@@ -106,6 +106,11 @@ class DashboardLink:
     type: str = "item"  # noqa: A003
     desc: str = ""
 
+    def __post_init__(self):
+        """Validate that location is one of the accepted values."""
+        if self.location not in DASHBOARD_LINK_LOCATIONS:
+            raise ValueError(f"location must be one of {DASHBOARD_LINK_LOCATIONS} - got '{self.location}'.")
+
 
 class KubeflowDashboardLinksUpdatedEvent(RelationEvent):
     """Indicates the Kubeflow Dashboard link data was updated."""
