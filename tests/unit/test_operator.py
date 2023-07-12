@@ -19,9 +19,9 @@ from ops.pebble import ChangeError
 from ops.testing import Harness
 
 from charm import (
-    ADDITIONAL_MENU_LINKS_CONFIG,
+    ADDITIONAL_LINKS_CONFIG_NAME,
     DASHBOARD_LINKS_RELATION_NAME,
-    MENU_LINKS_ORDER_CONFIG,
+    EXTERNAL_LINKS_ORDER_CONFIG_NAME,
     KubeflowDashboardOperator,
 )
 
@@ -292,7 +292,7 @@ class TestSidebarLinks:
         assert actual_items == expected_items
 
         # Add links to relations[0]
-        relation_data = add_data_to_sidebar_relation(harness_with_profiles, relations[0])
+        relation_data = add_menu_links_to_relation(harness_with_profiles, relations[0])
         relations[0].update(relation_data)
 
         actual_items = [
@@ -302,7 +302,7 @@ class TestSidebarLinks:
         assert actual_items == relations[0]["sidebar_items"]
 
         # Add some links to relation 2, skipping relation1
-        relation_data = add_data_to_sidebar_relation(harness_with_profiles, relations[2])
+        relation_data = add_menu_links_to_relation(harness_with_profiles, relations[2])
         relations[2].update(relation_data)
         actual_items = [
             DashboardLink(**item)
@@ -337,7 +337,7 @@ class TestSidebarLinks:
 
         # Add relation-based sidebar items
         relation = add_sidebar_relation(harness, other_app_name="other")
-        relation_data = add_data_to_sidebar_relation(harness, relation)
+        relation_data = add_menu_links_to_relation(harness, relation)
 
         # Add config-based sidebar items
         config_sidebar_items = [
@@ -346,11 +346,12 @@ class TestSidebarLinks:
                 link="link-user-1",
                 type="item-user-1",
                 icon="icon-user-1",
+                location="menu",
             ),
         ]
         config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
         harness.update_config(
-            {ADDITIONAL_MENU_LINKS_CONFIG: yaml.dump(config_sidebar_items_as_dicts)}
+            {ADDITIONAL_LINKS_CONFIG_NAME["menu"]: yaml.dump(config_sidebar_items_as_dicts)}
         )
 
         expected_sidebar_items = relation_data["sidebar_items"] + config_sidebar_items
@@ -370,7 +371,9 @@ class TestSidebarLinks:
 
         # Reorder the items via config
         preferred_links = ["text-user-1", "text-relation1-2"]  # the user-config link,
-        harness.update_config({MENU_LINKS_ORDER_CONFIG: yaml.dump(preferred_links)})
+        harness.update_config(
+            {EXTERNAL_LINKS_ORDER_CONFIG_NAME["menu"]: yaml.dump(preferred_links)}
+        )
 
         expected_sidebar_items_ordered = [
             config_sidebar_items[0],
@@ -392,7 +395,7 @@ def add_sidebar_relation(harness: Harness, other_app_name: str):
     return {"rel_id": rel_id, "app_name": other_app_name}
 
 
-def add_data_to_sidebar_relation(harness: Harness, relation_metadata: dict):
+def add_menu_links_to_relation(harness: Harness, relation_metadata: dict):
     """Adds mock sidebar relation data to a relation on a harness."""
     rel_id = relation_metadata["rel_id"]
     app_name = relation_metadata["app_name"]
@@ -402,6 +405,7 @@ def add_data_to_sidebar_relation(harness: Harness, relation_metadata: dict):
             link=f"link-relation{rel_id}-{i}",
             type=f"type-relation{rel_id}-{i}",
             icon=f"icon-relation{rel_id}-{i}",
+            location="menu",
         )
         for i in range(3)
     ]
