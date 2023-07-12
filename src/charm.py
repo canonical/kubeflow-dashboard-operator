@@ -4,17 +4,11 @@
 
 import json
 import logging
-from typing import List
 
-import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from charms.kubeflow_dashboard.v0.kubeflow_dashboard_sidebar import (
-    KubeflowDashboardSidebarProvider,
-    SidebarItem,
-    sidebar_items_to_json,
-)
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import KubeflowDashboardLinksProvider
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -25,13 +19,15 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
-ADDITIONAL_SIDEBAR_LINKS_CONFIG = "additional-sidebar-links"
+from dashboard_links import aggregate_links_as_json
+
+ADDITIONAL_MENU_LINKS_CONFIG = "additional-menu-links"
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
-SIDEBAR_LINKS_ORDER_CONFIG = "sidebar-link-order"
-SIDEBAR_RELATION_NAME = "sidebar"
+MENU_LINKS_ORDER_CONFIG = "menu-link-order"
+DASHBOARD_LINKS_RELATION_NAME = "links"
 
 
 class CheckFailed(Exception):
@@ -80,12 +76,12 @@ class KubeflowDashboardOperator(CharmBase):
             self.framework.observe(event, self.main)
         self.framework.observe(self.on.remove, self._on_remove)
 
-        # Handle the Kubeflow Dashboard sidebar relation
-        self.sidebar_provider = KubeflowDashboardSidebarProvider(
+        # Handle the Kubeflow Dashboard links relation
+        self.dashboard_link_provider = KubeflowDashboardLinksProvider(
             charm=self,
-            relation_name=SIDEBAR_RELATION_NAME,
+            relation_name=DASHBOARD_LINKS_RELATION_NAME,
         )
-        self.framework.observe(self.sidebar_provider.on.data_updated, self.main)
+        self.framework.observe(self.dashboard_link_provider.on.updated, self.main)
 
     @property
     def profiles_service(self):
@@ -102,13 +98,17 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def _context(self) -> dict:
         """Returns the context used to create Kubernetes resources."""
-        sidebar_items_as_json = self._get_sidebar_items_as_json()
+        menu_links_as_json = aggregate_links_as_json(
+            links_from_relation=self.dashboard_link_provider.get_dashboard_links(),
+            additional_link_config=self.model.config[ADDITIONAL_MENU_LINKS_CONFIG],
+            link_order_config=self.model.config[MENU_LINKS_ORDER_CONFIG],
+        )
 
         return {
             "app_name": self._name,
             "namespace": self._namespace,
             "configmap_name": self._configmap_name,
-            "links": sidebar_items_as_json,
+            "menuLinks": menu_links_as_json,
             "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
         }
 
@@ -241,72 +241,6 @@ class KubeflowDashboardOperator(CharmBase):
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]
 
-    def _get_sidebar_items(self) -> List[SidebarItem]:
-        """Returns a list of all SidebarItems for this charm.
-
-        Includes sidebar items defined through relations and user config.
-        """
-        sidebar_items = []
-        sidebar_items.extend(self.sidebar_provider.get_sidebar_items())
-        sidebar_items.extend(self._get_sidebar_items_from_config())
-        sidebar_items = sort_sidebar_items(
-            sidebar_items, preferred_links=self._get_sidebar_items_order_from_config()
-        )
-
-        return sidebar_items
-
-    def _get_sidebar_items_as_json(self) -> str:
-        """Returns a list of all SidebarItems for this charm, as a JSON string.
-
-        Includes sidebar items defined through relations and user config.
-        """
-        return sidebar_items_to_json(self._get_sidebar_items())
-
-    def _get_sidebar_items_from_config(self) -> List[SidebarItem]:
-        """Returns a list of SidebarItems as defined by the additional-sidebar-links config.
-
-        If there are errors in parsing the config, this returns an empty list and logs a warning.
-        """
-        error_message = (
-            f"Cannot parse user-defined sidebar links from config "
-            f"`{ADDITIONAL_SIDEBAR_LINKS_CONFIG}` - ignoring this input."
-        )
-
-        sidebar_config = self.model.config[ADDITIONAL_SIDEBAR_LINKS_CONFIG]
-        if not sidebar_config:
-            return []
-
-        try:
-            user_sidebar_links = yaml.safe_load(sidebar_config)
-        except yaml.YAMLError as err:
-            self.logger.warning(f"{error_message}  Got error: {err}")
-            return []
-
-        try:
-            user_sidebar_links = [SidebarItem(**item) for item in user_sidebar_links]
-        except TypeError as err:
-            self.logger.warning(f"{error_message}  Got error: {err}")
-            return []
-
-        return user_sidebar_links
-
-    def _get_sidebar_items_order_from_config(self) -> List[str]:
-        """Returns a list of strings defining the sidebar-link-order.
-
-        If there are errors in parsing the config, this returns an empty list and logs a warning.
-        """
-        error_message = (
-            f"Cannot parse user-defined sidebar link order from config "
-            f"`{SIDEBAR_LINKS_ORDER_CONFIG}` - ignoring this input and leaving links unordered."
-        )
-
-        sidebar_link_order = self.model.config[SIDEBAR_LINKS_ORDER_CONFIG]
-        try:
-            return yaml.safe_load(sidebar_link_order)
-        except Exception as err:
-            self.logger.warning(f"{error_message}  Got error: {err}")
-            return []
-
     def main(self, _) -> None:
         """Main entry point for the Charm."""
         try:
@@ -336,60 +270,6 @@ class KubeflowDashboardOperator(CharmBase):
             self.logger.warning(f"Failed to delete resources, with error: {e}")
             raise e
         self.unit.status = MaintenanceStatus("K8s resources removed")
-
-
-def sort_sidebar_items(sidebar_items: List[SidebarItem], preferred_links: List[str]):
-    """Sorts a list of SidebarItems by their link text, moving preferred links to the top.
-
-    The sorted order of the returned list will be:
-    * any links who have a text field that matches a string in `preferred_link_text`, in the order
-      specified in preferred_link_text
-    * any remaining links, in alphabetical order
-
-    For example, if:
-      sidebar_items=[SidebarItem(text="1"...), SidebarItem(text="2"...), SidebarItem(text="3"...)]
-      preferred_link_text=["2", "4"]
-    The return will be:
-      sidebar_items=[SidebarItem(text="2"...), SidebarItem(text="1"...), SidebarItem(text="3"...)]
-
-    If there are any links that have the same text, they will all be placed in the preferred
-    links at the top.  They will be in the same order as provided in sidebar_items.  For example:
-
-    For example, if:
-      sidebar_items=[
-        SidebarItem(text="other"...),
-        SidebarItem(text="1", link="1a", ...),
-        SidebarItem(text="1", link="1b", ...),
-      ]
-      preferred_link_text=["1"]
-    The return will be:
-      sidebar_items=[
-        SidebarItem(text="1", link="1a", ...),
-        SidebarItem(text="1", link="1b", ...),
-        SidebarItem(text="other"...),
-      ]
-
-    Args:
-        sidebar_items: List of SidebarItems to sort
-        preferred_links: List of strings of SidebarItem text values
-
-    Returns:
-        Ordered list of SidebarItems
-    """
-    ordered_sidebar_items = []
-    removed_sidebar_items_index = set()
-    for preferred_link in preferred_links:
-        for i, sidebar_item in enumerate(sidebar_items):
-            if sidebar_item.text == preferred_link:
-                ordered_sidebar_items.append(sidebar_item)
-                removed_sidebar_items_index.add(i)
-
-    remaining_sidebar_items = [
-        item for i, item in enumerate(sidebar_items) if i not in removed_sidebar_items_index
-    ]
-    remaining_sidebar_items = sorted(remaining_sidebar_items, key=lambda item: item.text)
-
-    return ordered_sidebar_items + remaining_sidebar_items
 
 
 if __name__ == "__main__":

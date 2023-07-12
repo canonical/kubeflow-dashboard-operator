@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 options:
-  additional-sidebar-links:
+  additional-menu-links:
     type: string
     default: ""
     description: >
@@ -11,9 +11,9 @@ options:
       {text: <string>, link: <string>, type: item, icon: <string>}.  For example: 
       '[{text: Another runs, link: /runs, type: item, icon: assessment}]'.
       This is typically easiest to configure from a file - define a YAML or JSON file, then pass to Juju via
-      `juju config kubeflow-dashboard additional-sidebar-links=@myfile.yaml`.
+      `juju config kubeflow-dashboard additional-menu-links=@myfile.yaml`.
       See [upstream docs](https://www.kubeflow.org/docs/components/central-dash/customizing-menu/) for more details on
-      the sidebar and link format.
+      the menu and link format.
   dashboard-configmap:
     type: string
     default: centraldashboard-config
@@ -26,7 +26,7 @@ options:
     type: boolean
     default: true
     description: Whether to enable the registration flow on sign-in
-  sidebar-link-order:
+  menu-link-order:
     type: string
     default: '["Notebooks", "Experiments (AutoML)", "Experiments (KFP)", "Pipelines", "Runs", "Recurring Runs", "Volumes", "Tensorboards"]'
     description: > 
