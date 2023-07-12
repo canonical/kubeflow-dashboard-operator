@@ -68,7 +68,7 @@ from ops.framework import Object, ObjectEvents, EventSource, BoundEvent, EventBa
 logger = logging.getLogger(__name__)
 
 # The unique Charmhub library identifier, never change it
-LIBID = "a5795a88ee31458f9bc3ae026a04b89f"
+LIBID = "635fdbfc0fcc420882835d4c0086bb5d"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
