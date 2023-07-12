@@ -123,10 +123,10 @@ class KubeflowDashboardLinksProvider(Object):
     on = KubeflowDashboardLinksEvents()
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str,
-            refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        self,
+        charm: CharmBase,
+        relation_name: str,
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
         """Relation manager for the Provider side of the Kubeflow Dashboard Links relation.
 
@@ -169,7 +169,7 @@ class KubeflowDashboardLinksProvider(Object):
                 self.framework.observe(evt, self._on_relation_changed)
 
     def get_dashboard_links(
-            self, omit_breaking_app: bool = True, location: Optional[str] = None
+        self, omit_breaking_app: bool = True, location: Optional[str] = None
     ) -> List[DashboardLink]:
         """Returns a list of all DashboardItems from related Applications.
 
@@ -216,7 +216,7 @@ class KubeflowDashboardLinksProvider(Object):
         return dashboard_links
 
     def get_dashboard_links_as_json(
-            self, omit_breaking_app: bool = True, location: Optional[str] = None
+        self, omit_breaking_app: bool = True, location: Optional[str] = None
     ) -> str:
         """Returns a JSON string of all DashboardItems from related Applications.
 
@@ -246,11 +246,11 @@ class KubeflowDashboardLinksRequirer(Object):
     """Relation manager for the Requirer side of the Kubeflow Dashboard Links relation."""
 
     def __init__(
-            self,
-            charm: CharmBase,
-            relation_name: str,
-            dashboard_links: List[DashboardLink],
-            refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
+        self,
+        charm: CharmBase,
+        relation_name: str,
+        dashboard_links: List[DashboardLink],
+        refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
         """
         Relation manager for the Requirer side of the Kubeflow Dashboard Link relation.
