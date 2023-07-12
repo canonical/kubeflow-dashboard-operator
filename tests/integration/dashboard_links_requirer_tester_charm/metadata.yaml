@@ -4,5 +4,5 @@ name: kubeflow-dashboard-requirer-mock
 description: none
 summary: none
 requires:
-  sidebar:
-    interface: kubeflow_dashboard_sidebar
+  dashboard-links:
+    interface: kubeflow_dashboard_links
