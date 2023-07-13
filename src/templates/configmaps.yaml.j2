@@ -1,7 +1,13 @@
 apiVersion: v1
 data:
   links: |-
-    {{ links }}
+    {
+      "menuLinks": {{ menuLinks }},
+      "externalLinks": {{ externalLinks }},
+      "quickLinks": {{ quickLinks }},
+      "documentationItems": {{ documentationItems }}
+    }
+
   settings: "{'DASHBOARD_FORCE_IFRAME': true}"
 kind: ConfigMap
 metadata:

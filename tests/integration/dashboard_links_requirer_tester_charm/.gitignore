@@ -1,0 +1,10 @@
+.coverage
+build/
+.tox/
+__pycache__
+*.charm
+geckodriver.log
+.idea
+
+# vscode 
+.vscode
