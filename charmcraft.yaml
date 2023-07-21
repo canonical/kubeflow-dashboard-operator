@@ -13,5 +13,5 @@ parts:
   charm:
     prime:
       - files/*yaml
-    # do not use these versions due to pypa/setuptools_scm#713
-    charm-python-packages: [ setuptools!=62.2.0, pip!=22.1 ]
+    charm-python-packages: [ setuptools, pip ]
+    build-packages: [rustc]
