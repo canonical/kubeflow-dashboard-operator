@@ -258,7 +258,6 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     # Move the user-driven links '*2' from the previous test to the top of the list
     # Test with both menu and documentation to confirm it works for different locations.
     for location in ["menu", "documentation"]:
-
         link_order = [f"{location}-config2"]
 
         await ops_test.model.applications[CHARM_NAME].set_config(
