@@ -7,5 +7,5 @@ ops
 pytest
 pytest-mock
 pytest-lazy-fixture
-pyyaml
+pyyaml>6.0
 serialized-data-interface
