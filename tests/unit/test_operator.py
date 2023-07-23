@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
+from dataclasses import asdict
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -8,14 +9,22 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
+    DASHBOARD_LINKS_FIELD,
+    DashboardLink,
+)
 from lightkube import ApiError
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
 from ops.testing import Harness
 
-from charm import KubeflowDashboardOperator
+from charm import (
+    ADDITIONAL_LINKS_CONFIG_NAME,
+    DASHBOARD_LINKS_RELATION_NAME,
+    EXTERNAL_LINKS_ORDER_CONFIG_NAME,
+    KubeflowDashboardOperator,
+)
 
-BASE_SIDEBAR = Path("src/config/sidebar_config.json").read_text()
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
 RELATION_DATA = [
@@ -28,14 +37,7 @@ RELATION_DATA = [
     }
 ]
 
-DEFAULT_CONTEXT = {
-    "app_name": "kubeflow-dashboard",
-    "namespace": "kubeflow",
-    "configmap_name": "centraldashboard-config",
-    "profilename": "test-profile",
-    "links": BASE_SIDEBAR,
-    "settings": "",
-}
+
 DEFAULT_RESOURCE_FILES = [
     "profile_crds.yaml.j2",
     "auth_manifests.yaml.j2",
@@ -207,14 +209,15 @@ class TestCharm:
         configmap_handler: MagicMock,
         harness_with_profiles: Harness,
     ):
-        expected_links = json.loads(BASE_SIDEBAR)
+        expected_links = []
         harness_with_profiles.begin()
         harness_with_profiles.charm.on.install.emit()
         k8s_resource_handler.apply.assert_called()
         configmap_handler.apply.assert_called_once()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
-        assert json.loads(harness_with_profiles.charm._context["links"]) == expected_links
+        actual_links = json.loads(harness_with_profiles.charm._context["menuLinks"])
+        assert actual_links == expected_links
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
@@ -248,3 +251,170 @@ class TestCharm:
         harness_with_profiles.begin()
         with pytest.raises(ApiError):
             harness_with_profiles.charm.on.remove.emit()
+
+
+class TestSidebarLinks:
+    """Tests for the sidebar relation."""
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_context_with_sidebar_relations_no_links(
+        self,
+        harness_with_profiles: Harness,
+    ):
+        """Tests that context renders properly when no sidebar relations are present."""
+        expected_links = []
+        harness_with_profiles.begin()
+        actual_links = json.loads(harness_with_profiles.charm._context["menuLinks"])
+        assert actual_links == expected_links
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    @patch("charm.KubeflowDashboardOperator.configmap_handler")
+    @patch("charm.delete_many")
+    def test_context_with_adding_and_removing_sidebar_relations(
+        self,
+        update_layer: MagicMock,
+        k8s_resource_handler: MagicMock,
+        configmap_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        """e2e test of the sidebar relation, checking k8s context for added/removed relations."""
+        harness_with_profiles.begin()
+
+        relations = [
+            add_sidebar_relation(harness_with_profiles, other_app_name=f"other{i}")
+            for i in range(3)
+        ]
+
+        # Related apps, but no links
+        expected_items = []
+        actual_items = json.loads(harness_with_profiles.charm._context["menuLinks"])
+        assert actual_items == expected_items
+
+        # Add links to relations[0]
+        relation_data = add_menu_links_to_relation(harness_with_profiles, relations[0])
+        relations[0].update(relation_data)
+
+        actual_items = [
+            DashboardLink(**item)
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
+        ]
+        assert actual_items == relations[0]["sidebar_items"]
+
+        # Add some links to relation 2, skipping relation1
+        relation_data = add_menu_links_to_relation(harness_with_profiles, relations[2])
+        relations[2].update(relation_data)
+        actual_items = [
+            DashboardLink(**item)
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
+        ]
+        assert actual_items == relations[0]["sidebar_items"] + relations[2]["sidebar_items"]
+
+        # Remove relation1, which should do nothing to the sidebar items
+        harness_with_profiles.remove_relation(relation_id=relations[1]["rel_id"])
+        actual_items = [
+            DashboardLink(**item)
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
+        ]
+        assert actual_items == relations[0]["sidebar_items"] + relations[2]["sidebar_items"]
+
+        # Remove relation0, which should leave only the second set of sidebar items
+        harness_with_profiles.remove_relation(relation_id=relations[0]["rel_id"])
+        actual_items = [
+            DashboardLink(**item)
+            for item in json.loads(harness_with_profiles.charm._context["menuLinks"])
+        ]
+        assert actual_items == relations[2]["sidebar_items"]
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_sidebar_relation_and_config_and_ordering_together(
+        self,
+        harness_with_profiles: Harness,
+    ):
+        """Tests that combining relation- and user-driven sidebar items, with ordering."""
+        # Arrange
+        harness = harness_with_profiles
+
+        # Add relation-based sidebar items
+        relation = add_sidebar_relation(harness, other_app_name="other")
+        relation_data = add_menu_links_to_relation(harness, relation)
+
+        # Add config-based sidebar items
+        config_sidebar_items = [
+            DashboardLink(
+                text="text-user-1",
+                link="link-user-1",
+                type="item-user-1",
+                icon="icon-user-1",
+                location="menu",
+            ),
+        ]
+        config_sidebar_items_as_dicts = [asdict(link) for link in config_sidebar_items]
+        harness.update_config(
+            {ADDITIONAL_LINKS_CONFIG_NAME["menu"]: yaml.dump(config_sidebar_items_as_dicts)}
+        )
+
+        expected_sidebar_items = relation_data["sidebar_items"] + config_sidebar_items
+        harness.begin()
+
+        # Mock away lightkube-related tooling so config-changed hooks dont fail
+        harness.charm._deploy_k8s_resources = MagicMock()
+
+        # Act
+        actual_items = [
+            DashboardLink(**item) for item in json.loads(harness.charm._context["menuLinks"])
+        ]
+
+        # Assert
+        # Should include both relation- and config-based items, ordered relation then config
+        assert actual_items == expected_sidebar_items
+
+        # Reorder the items via config
+        preferred_links = ["text-user-1", "text-relation1-2"]  # the user-config link,
+        harness.update_config(
+            {EXTERNAL_LINKS_ORDER_CONFIG_NAME["menu"]: yaml.dump(preferred_links)}
+        )
+
+        expected_sidebar_items_ordered = [
+            config_sidebar_items[0],
+            relation_data["sidebar_items"][2],
+            relation_data["sidebar_items"][0],
+            relation_data["sidebar_items"][1],
+        ]
+        # Assert
+        # Should include both relation- and config-based items, ordered as set in config
+        actual_items = [
+            DashboardLink(**item) for item in json.loads(harness.charm._context["menuLinks"])
+        ]
+        assert actual_items == expected_sidebar_items_ordered
+
+
+def add_sidebar_relation(harness: Harness, other_app_name: str):
+    """Adds a sidebar relation to a harness."""
+    rel_id = harness.add_relation(DASHBOARD_LINKS_RELATION_NAME, remote_app=other_app_name)
+    return {"rel_id": rel_id, "app_name": other_app_name}
+
+
+def add_menu_links_to_relation(harness: Harness, relation_metadata: dict):
+    """Adds mock sidebar relation data to a relation on a harness."""
+    rel_id = relation_metadata["rel_id"]
+    app_name = relation_metadata["app_name"]
+    sidebar_items = [
+        DashboardLink(
+            text=f"text-relation{rel_id}-{i}",
+            link=f"link-relation{rel_id}-{i}",
+            type=f"type-relation{rel_id}-{i}",
+            icon=f"icon-relation{rel_id}-{i}",
+            location="menu",
+        )
+        for i in range(3)
+    ]
+    databag = {
+        DASHBOARD_LINKS_FIELD: json.dumps([asdict(sidebar_item) for sidebar_item in sidebar_items])
+    }
+    harness.update_relation_data(relation_id=rel_id, app_or_unit=app_name, key_values=databag)
+
+    return {
+        "sidebar_items": sidebar_items,
+        "databag": databag,
+    }
