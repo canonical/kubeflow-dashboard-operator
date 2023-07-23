@@ -2,4 +2,5 @@ coverage
 pytest
 pytest-mock
 pytest-lazy-fixture
+pyyaml>6.0
 -r requirements.txt
