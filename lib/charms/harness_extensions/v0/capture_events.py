@@ -19,7 +19,7 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 3
 
-# Copyright 2023 Canonical Ltd.
+# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 from contextlib import contextmanager
