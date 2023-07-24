@@ -3,5 +3,5 @@
 
 charmed-kubeflow-chisme
 lightkube
-ops<2
+ops
 serialized-data-interface
