@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 type: charm
@@ -14,9 +14,3 @@ parts:
     prime:
       - files/*yaml
     charm-python-packages: [setuptools, pip]
-    # Workaround for https://github.com/python-jsonschema/jsonschema/issues/1114
-    # and https://github.com/crate-py/rpds/issues/6
-    # and https://github.com/python-jsonschema/jsonschema/issues/1117
-    # TODO: jsonschema is a dependency of SDI, once SDI is not used on this charm,
-    # this workaround can be removed
-    charm-binary-python-packages: [jsonschema]
