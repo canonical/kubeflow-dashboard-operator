@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 charmed-kubeflow-chisme
 lightkube
 ops
+pyyaml
 serialized-data-interface

@@ -1,11 +1,11 @@
-charmed-kubeflow-chisme
 # Pinning to <3.0 to ensure compatibility with the 2.9 controller version
 # Note: 3.0 is not being maintained anymore
 juju<3.0
 lightkube
 ops
+pytest
+pytest-asyncio
 pytest-operator
 pyyaml
 selenium
 selenium-wire
-serialized-data-interface

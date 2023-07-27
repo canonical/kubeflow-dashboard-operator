@@ -83,6 +83,7 @@ pytest-mock==3.11.1
 pyyaml==6.0.1
     # via
     #   -r ./requirements-unit.in
+    #   -r ./requirements.in
     #   lightkube
     #   ops
     #   serialized-data-interface
