@@ -90,12 +90,12 @@ class DashboardLink:
 
     Args:
         text: The text shown for the link
-        link: The link (a relative link for `location=sidebar` or `location=quick`, eg: `/mlflow`,
+        link: The link (a relative link for `location=menu` or `location=quick`, eg: `/mlflow`,
               or a full URL for other locations, eg: http://my-website.com)
-        type: A type of sidebar entry (typically, "item")
+        type: A type of link entry (typically, "item")
         icon: An icon for the link, from
               https://kevingleason.me/Polymer-Todo/bower_components/iron-icons/demo/index.html
-        location: Link's location on the dashboard.  One of `sidebar`, `sidebar_external`, `quick`,
+        location: Link's location on the dashboard.  One of `menu`, `external`, `quick`,
                   and `documentation`.
     """
 
