@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
 from dataclasses import asdict
@@ -193,6 +193,8 @@ class TestCharm:
         harness_with_profiles: Harness,
     ):
         harness_with_profiles.begin()
+        container = harness_with_profiles.charm.model.unit.get_container(CHARM_NAME)
+        harness_with_profiles.set_can_connect(container, True)
         harness_with_profiles.charm.on.install.emit()
         k8s_resource_handler.apply.assert_called_once()
         configmap_handler.apply.assert_called_once()
@@ -211,8 +213,10 @@ class TestCharm:
     ):
         expected_links = []
         harness_with_profiles.begin()
+        container = harness_with_profiles.charm.model.unit.get_container(CHARM_NAME)
+        harness_with_profiles.set_can_connect(container, True)
         harness_with_profiles.charm.on.install.emit()
-        k8s_resource_handler.apply.assert_called()
+        k8s_resource_handler.apply.assert_called_once()
         configmap_handler.apply.assert_called_once()
         update_layer.assert_called()
         assert isinstance(harness_with_profiles.charm.model.unit.status, ActiveStatus)
