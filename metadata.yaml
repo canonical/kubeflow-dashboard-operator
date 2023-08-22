@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 name: kubeflow-dashboard
 summary: Kubeflow Central Dashboard
@@ -12,6 +12,9 @@ resources:
     description: 'Backing OCI image'
     auto-fetch: true
     upstream-source: docker.io/kubeflownotebookswg/centraldashboard:v1.7.0
+provides:
+  links:
+    interface: kubeflow_dashboard_links
 requires:
   ingress:
     interface: ingress

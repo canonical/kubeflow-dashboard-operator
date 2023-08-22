@@ -1,0 +1,19 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+options:
+  menu_link_texts:
+    type: string
+    description: YAML/JSON list of strings of link texts.  A link per text will be generated, prepended by app.name.
+    default: ''
+  external_link_texts:
+    type: string
+    description: YAML/JSON list of strings of link texts.  A link per text will be generated, prepended by app.name.
+    default: ''
+  quick_link_texts:
+    type: string
+    description: YAML/JSON list of strings of link texts.  A link per text will be generated, prepended by app.name.
+    default: ''
+  documentation_link_texts:
+    type: string
+    description: YAML/JSON list of strings of link texts.  A link per text will be generated, prepended by app.name.
+    default: ''

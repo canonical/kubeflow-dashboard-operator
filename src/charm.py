@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import json
 import logging
-from pathlib import Path
 
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
+    DASHBOARD_LINK_LOCATIONS,
+    KubeflowDashboardLinksProvider,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -19,12 +22,21 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interfaces
 
-BASE_SIDEBAR = json.loads(Path("src/config/sidebar_config.json").read_text())
+from dashboard_links import aggregate_links_as_json
+
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
-SIDEBAR_RELATION_NAME = "sidebar"
+
+DASHBOARD_LINKS_RELATION_NAME = "links"
+# Map of location to the config field names for that location
+ADDITIONAL_LINKS_CONFIG_NAME = {
+    location: f"additional-{location}-links" for location in DASHBOARD_LINK_LOCATIONS
+}
+EXTERNAL_LINKS_ORDER_CONFIG_NAME = {
+    location: f"{location}-link-order" for location in DASHBOARD_LINK_LOCATIONS
+}
 
 
 class CheckFailed(Exception):
@@ -55,17 +67,12 @@ class KubeflowDashboardOperator(CharmBase):
         self._configmap_name = self.model.config["dashboard-configmap"]
         self._port = self.model.config["port"]
         self._registration_flow = self.model.config["registration-flow"]
-        self._context = {
-            "app_name": self._name,
-            "namespace": self._namespace,
-            "configmap_name": self._configmap_name,
-            "links": json.dumps(BASE_SIDEBAR),
-            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
-        }
         self._k8s_resource_handler = None
         self._configmap_handler = None
+
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(self, [port])
+
         for event in [
             self.on.install,
             self.on.leader_elected,
@@ -78,6 +85,13 @@ class KubeflowDashboardOperator(CharmBase):
             self.framework.observe(event, self.main)
         self.framework.observe(self.on.remove, self._on_remove)
 
+        # Handle the Kubeflow Dashboard links relation
+        self.dashboard_link_provider = KubeflowDashboardLinksProvider(
+            charm=self,
+            relation_name=DASHBOARD_LINKS_RELATION_NAME,
+        )
+        self.framework.observe(self.dashboard_link_provider.on.updated, self.main)
+
     @property
     def profiles_service(self):
         return self._profiles_service
@@ -89,6 +103,22 @@ class KubeflowDashboardOperator(CharmBase):
     @property
     def container(self):
         return self._container
+
+    @property
+    def _context(self) -> dict:
+        """Returns the context used to create Kubernetes resources."""
+        links = self._get_dashboard_links()
+
+        return {
+            "app_name": self._name,
+            "namespace": self._namespace,
+            "configmap_name": self._configmap_name,
+            "menuLinks": links["menu"],
+            "externalLinks": links["external"],
+            "quickLinks": links["quick"],
+            "documentationItems": links["documentation"],
+            "settings": json.dumps({"DASHBOARD_FORCE_IFRAME": True}),
+        }
 
     @property
     def k8s_resource_handler(self):
@@ -215,6 +245,19 @@ class KubeflowDashboardOperator(CharmBase):
         except ApiError as e:
             raise GenericCharmRuntimeError("Failed to create K8S resources") from e
         self.model.unit.status = ActiveStatus()
+
+    def _get_dashboard_links(self):
+        links = {}
+        for location in DASHBOARD_LINK_LOCATIONS:
+            links[location] = aggregate_links_as_json(
+                links_from_relation=self.dashboard_link_provider.get_dashboard_links(
+                    location=location
+                ),
+                additional_link_config=self.model.config[ADDITIONAL_LINKS_CONFIG_NAME[location]],
+                link_order_config=self.model.config[EXTERNAL_LINKS_ORDER_CONFIG_NAME[location]],
+                location=location,
+            )
+        return links
 
     def _get_data_from_profiles_interface(self, kf_profiles_interface):
         return list(kf_profiles_interface.get_data().values())[0]
