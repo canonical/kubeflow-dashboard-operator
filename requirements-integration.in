@@ -1,5 +1,14 @@
-juju<3.1
+# Pinning to <3.0 to ensure compatibility with the 2.9 controller version
+# Note: 3.0 is not being maintained anymore
+juju<3.0
+lightkube
+ops
+pytest
+pytest-asyncio
 pytest-operator
+pyyaml
 selenium
 selenium-wire
--r requirements.txt
+# This is needed only for this charm as the integration test files in
+# test/integration/ have imports from the charm code in src/charm.py
+-r requirements.in

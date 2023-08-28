@@ -1,16 +1,64 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 options:
+  additional-menu-links:
+    type: string
+    default: ''
+    description: >
+      YAML or JSON formatted input defining additional menu links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-external-links:
+    type: string
+    default: ''
+    description: >
+      YAML or JSON formatted input defining additional external links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-quick-links:
+    type: string
+    default: '[]'
+    description: >
+      YAML or JSON formatted input defining additional quick links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  additional-documentation-links:
+    type: string
+    default: '[{"text":"Getting started with Charmed Kubeflow","desc":"Learn how to get started with Kubeflow","link":"https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--part-ii-get-started-with-charmed-kubeflow"},{"text":"Microk8s for Kubeflow","desc":"Quickly get Kubeflow running locally on native hypervisors","link":"https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow#heading--install-and-prepare-microk8s-"},{"text":"Requirements for Kubeflow","desc":"Get more detailed information about using Kubeflow and its components","link":"https://www.kubeflow.org/docs/started/requirements/"}]'
+    description: >
+      YAML or JSON formatted input defining additional documentation links.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  dashboard-configmap:
+    type: string
+    default: centraldashboard-config
+    description: Name of the Kubeflow Dashboard configmap to be created
   port:
     type: int
     default: 8082
     description: HTTP port
-  dashboard-configmap:
-    type: string
-    default: centraldashboard-config
-    description: Kubeflow Profile to create
   registration-flow:
     type: boolean
     default: true
     description: Whether to enable the registration flow on sign-in
+  menu-link-order:
+    type: string
+    default: '["Notebooks", "Experiments (AutoML)", "Experiments (KFP)", "Pipelines", "Runs", "Recurring Runs", "Volumes", "Tensorboards"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the menu links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  external-link-order:
+    type: string
+    default: '["MLflow"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the external links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  quick-link-order:
+    type: string
+    default: '["Upload a pipeline","View all pipeline runs","Create a new Notebook server","View Katib Experiments"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the quick links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  documentation-link-order:
+    type: string
+    default: '["Getting started with Charmed Kubeflow","Microk8s for Kubeflow","Requirements for Kubeflow"]'
+    description: >
+      YAML or JSON formatted list of strings defining the order of the documentation links in the dashboard sidebar.  
+      For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
