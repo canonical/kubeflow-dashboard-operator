@@ -11,7 +11,7 @@ jobs:
   lib-check:
     name: Check libraries
     # TODO: Pin this to a version once charmed-kubeflow-workflows has versioned release
-    uses: canonical/charmed-kubeflow-workflows/.github/workflows/_quality-checks.yaml@f0e79034881a1b33a0742fa9a034c96a14652df2
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/_quality-checks.yaml@4d1d8d09d5a164cd060005fa78e1c039590515ea
     secrets: inherit
     with:
         charm-path: "."
