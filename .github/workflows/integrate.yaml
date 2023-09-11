@@ -54,7 +54,7 @@ jobs:
         with:
             provider: microk8s
             channel: 1.25-strict/stable
-            microk8s-addons: "rbac ingress metallb:10.64.140.43-10.64.140.49"
+            microk8s-addons: "dns hostpath-storage rbac ingress metallb:10.64.140.43-10.64.140.49"
             juju-channel: 3.1/stable
             charmcraft-channel: latest/candidate
 
