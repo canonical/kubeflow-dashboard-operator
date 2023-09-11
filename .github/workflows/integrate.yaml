@@ -10,8 +10,7 @@ on:
 jobs:
   lib-check:
     name: Check libraries
-    # TODO: Pin this to a version once charmed-kubeflow-workflows has versioned release
-    uses: canonical/charmed-kubeflow-workflows/.github/workflows/_quality-checks.yaml@f0e79034881a1b33a0742fa9a034c96a14652df2
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/_quality-checks.yaml@main
     secrets: inherit
     with:
         charm-path: "."
@@ -54,19 +53,10 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
-            channel: 1.24/stable
+            channel: 1.25-strict/stable
+            microk8s-addons: "dns hostpath-storage rbac ingress metallb:10.64.140.43-10.64.140.49"
+            juju-channel: 3.1/stable
             charmcraft-channel: latest/candidate
-          # TODO: Unpin this when this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833.
-          #       In particular, these tests failed deploying the prometheus-k8s charm where it gets an error in
-          #       the "metrics-endpoint-relation-changed" hook.
-            bootstrap-options: --agent-version="2.9.34"
-      
-      - name: Configure microk8s
-        run: |
-          sg microk8s -c "microk8s enable rbac ingress metallb:10.64.140.43-10.64.140.49"
-          # Requires the model to be called kubeflow due to this bug:
-          # https://github.com/kubeflow/kubeflow/issues/6136
-          juju add-model kubeflow
 
       - name: Install Chrome driver
         run: |
@@ -76,7 +66,8 @@ jobs:
 
       - name: Run test
         run: |
-          sg microk8s -c "tox -e integration -- --model kubeflow"
+          juju add-model kubeflow
+          sg snap_microk8s -c "tox -e integration -- --model kubeflow"
 
       - name: Get juju status
         run: juju status
