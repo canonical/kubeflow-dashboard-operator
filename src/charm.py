@@ -170,7 +170,7 @@ class KubeflowDashboardOperator(CharmBase):
                         "REGISTRATION_FLOW": self._registration_flow,
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
-                        "POD_NAMESPACE": self.model.name,   # Added due to https://github.com/canonical/bundle-kubeflow/issues/698
+                        "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698   # noqa E501
                     },
                 }
             },
