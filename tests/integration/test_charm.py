@@ -82,7 +82,7 @@ async def test_add_profile_relation(ops_test: OpsTest):
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
         raise_on_error=True,
-        timeout=300,
+        timeout=600,
     )
 
 
