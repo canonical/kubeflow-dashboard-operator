@@ -3,6 +3,7 @@
 name: kubeflow-dashboard
 summary: Kubeflow Central Dashboard
 description: Kubeflow Central Dashboard
+docs: https://discourse.charmhub.io/t/8231
 containers:
   kubeflow-dashboard:
     resource: oci-image
