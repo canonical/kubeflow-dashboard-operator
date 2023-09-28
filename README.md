@@ -1,5 +1,5 @@
 ## Kubeflow Dashboard Operator - a component of the Charmed Kubeflow distribution from Canonical
-
+non-functional change to trigger CI
 This repository hosts the Kubeflow Dashboard operaotr
 (see [CharmHub](https://charmhub.io/kubeflow-dashboard).
 
