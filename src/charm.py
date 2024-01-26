@@ -224,6 +224,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "rewrite": "/",
                     "service": self.model.app.name,
                     "port": self._port,
+                    "namespace": self._namespace,
                 }
             )
 
