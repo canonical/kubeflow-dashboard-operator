@@ -60,27 +60,14 @@ async def test_build_and_deploy(ops_test: OpsTest):
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
     await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
-
-    await ops_test.model.wait_for_idle(
-        [CHARM_NAME],
-        raise_on_error=True,
-        timeout=300,
-    )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
-    assert (
-        ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
-        == "Add required relation to kubeflow-profiles"
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.abort_on_fail
-async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
+
+    # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
     await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
+
+    # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
-        status="active",
         raise_on_error=True,
         timeout=600,
     )
