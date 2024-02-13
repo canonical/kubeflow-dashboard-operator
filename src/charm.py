@@ -164,7 +164,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "command": self._service,
                     "startup": "enabled",
                     "environment": {
-                        "NODE_ENV": "production":,
+                        "NODE_ENV": "production",
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
