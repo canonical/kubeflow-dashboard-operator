@@ -66,7 +66,7 @@ jobs:
 
       - name: Run test
         run: |
-          juju add-model kubeflow --config automatically-retry-hooks=false
+          juju add-model kubeflow
           sg snap_microk8s -c "tox -e integration -- --model kubeflow"
 
       - name: Get juju status
