@@ -12,7 +12,7 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: charmedkubeflow/kubeflow-central-dashboard:1.8-3abeabc
+    upstream-source: charmedkubeflow/kubeflow-central-dashboard:1.8-0719441
 provides:
   links:
     interface: kubeflow_dashboard_links

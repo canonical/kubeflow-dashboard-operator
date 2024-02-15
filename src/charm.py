@@ -61,7 +61,11 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
-        self._service = "/usr/bin/npm start --prefix /app"
+
+        # The service name must be consistent with the one defined in the rockcraft project
+        self._pebble_service_name = "serve"
+        self._pebble_service_command = "/usr/bin/npm start"
+
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
@@ -158,10 +162,10 @@ class KubeflowDashboardOperator(CharmBase):
             "summary": "kubeflow-dashboard-operator layer",
             "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
-                "serve": {
+                self._pebble_service_name: {
                     "override": "replace",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
-                    "command": self._service,
+                    "command": self._pebble_service_command,
                     "startup": "enabled",
                     "environment": {
                         "NODE_ENV": "production",
