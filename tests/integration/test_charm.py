@@ -68,6 +68,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
+        status="active",
         raise_on_error=True,
         timeout=600,
     )
