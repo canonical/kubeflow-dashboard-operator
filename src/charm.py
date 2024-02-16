@@ -167,7 +167,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": self._pebble_service_command,
                     "startup": "enabled",
-                    "working-dir": "/app"
+                    "working-dir": "/app",
                     "environment": {
                         "NODE_ENV": "production",
                         "USERID_HEADER": "kubeflow-userid",
