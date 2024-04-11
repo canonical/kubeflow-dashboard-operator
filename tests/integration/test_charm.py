@@ -25,7 +25,9 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
-PROFILES_CHARM_NAME = "kubeflow-profiles"
+KUBEFLOW_PROFILES = "kubeflow-profiles"
+KUBEFLOW_PROFILES_CHANNEL = "1.8/stable"
+KUBEFLOW_PROFILES_TRUST = True
 
 DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
@@ -76,10 +78,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
-    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
-    await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
+    await ops_test.model.deploy(KUBEFLOW_PROFILES, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST)
+    await ops_test.model.relate(KUBEFLOW_PROFILES, CHARM_NAME)
     await ops_test.model.wait_for_idle(
-        [PROFILES_CHARM_NAME, CHARM_NAME],
+        [KUBEFLOW_PROFILES, CHARM_NAME],
         status="active",
         raise_on_error=True,
         timeout=600,
