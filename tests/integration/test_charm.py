@@ -78,7 +78,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
-    await ops_test.model.deploy(KUBEFLOW_PROFILES, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST)
+    await ops_test.model.deploy(
+        KUBEFLOW_PROFILES, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST
+    )
     await ops_test.model.relate(KUBEFLOW_PROFILES, CHARM_NAME)
     await ops_test.model.wait_for_idle(
         [KUBEFLOW_PROFILES, CHARM_NAME],
