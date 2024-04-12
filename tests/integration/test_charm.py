@@ -20,7 +20,8 @@ from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
-from tests.integration import constants
+
+from . import constants
 
 
 @pytest.fixture(scope="module")
