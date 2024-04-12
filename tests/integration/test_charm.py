@@ -21,19 +21,32 @@ from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
 
-from . import constants
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CHARM_NAME = METADATA["name"]
+CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
+CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
+KUBEFLOW_PROFILES = "kubeflow-profiles"
+KUBEFLOW_PROFILES_CHANNEL = "1.8/stable"
+KUBEFLOW_PROFILES_TRUST = True
+
+DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
+    "tests/integration/dashboard_links_requirer_tester_charm"
+).absolute()
+TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
+
+DEFAULT_DOCUMENTATION_TEXTS = [
+    "Getting started with Charmed Kubeflow",
+    "Microk8s for Kubeflow",
+    "Requirements for Kubeflow",
+]
 
 
 @pytest.fixture(scope="module")
 def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
     lib = Path("lib/charms/kubeflow_dashboard/v0/kubeflow_dashboard_links.py")
-    Path(constants.DASHBOARD_LINKS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(
-        parents=True, exist_ok=True
-    )
-    shutil.copyfile(
-        lib.as_posix(), (constants.DASHBOARD_LINKS_REQUIRER_TESTER_CHARM / lib).as_posix()
-    )
+    Path(DASHBOARD_LINKS_REQUIRER_TESTER_CHARM, lib.parent).mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lib.as_posix(), (DASHBOARD_LINKS_REQUIRER_TESTER_CHARM / lib).as_posix())
 
 
 @pytest_asyncio.fixture
@@ -46,19 +59,18 @@ async def lightkube_client():
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
+    image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
-    await ops_test.model.deploy(
-        my_charm, resources={"oci-image": constants.IMAGE_PATH}, trust=True
-    )
+    await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
 
     await ops_test.model.wait_for_idle(
-        [constants.CHARM_NAME],
+        [CHARM_NAME],
         raise_on_error=True,
         timeout=300,
     )
-    assert ops_test.model.applications[constants.CHARM_NAME].units[0].workload_status == "blocked"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
     assert (
-        ops_test.model.applications[constants.CHARM_NAME].units[0].workload_status_message
+        ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
         == "Add required relation to kubeflow-profiles"
     )
 
@@ -67,13 +79,11 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.deploy(
-        constants.KUBEFLOW_PROFILES,
-        channel=constants.KUBEFLOW_PROFILES_CHANNEL,
-        trust=constants.KUBEFLOW_PROFILES_TRUST,
+        KUBEFLOW_PROFILES, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST
     )
-    await ops_test.model.relate(constants.KUBEFLOW_PROFILES, constants.CHARM_NAME)
+    await ops_test.model.relate(KUBEFLOW_PROFILES, CHARM_NAME)
     await ops_test.model.wait_for_idle(
-        [constants.KUBEFLOW_PROFILES, constants.CHARM_NAME],
+        [KUBEFLOW_PROFILES, CHARM_NAME],
         status="active",
         raise_on_error=True,
         timeout=600,
@@ -82,7 +92,7 @@ async def test_add_profile_relation(ops_test: OpsTest):
 
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
-    assert ops_test.model.applications[constants.CHARM_NAME].units[0].workload_status == "active"
+    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
 @pytest.mark.parametrize(
@@ -91,7 +101,7 @@ async def test_status(ops_test: OpsTest):
         ("menu", [""]),
         ("external", [""]),
         ("quick", [""]),
-        ("documentation", constants.DEFAULT_DOCUMENTATION_TEXTS),
+        ("documentation", DEFAULT_DOCUMENTATION_TEXTS),
     ],
 )
 def test_configmap_contents_no_relations_or_config(
@@ -132,7 +142,7 @@ async def test_configmap_contents_with_relations(
     expected_links = {name: [] for name in DASHBOARD_LINK_LOCATIONS}
 
     for tester_suffix in ["1", "2"]:
-        tester = f"{constants.TESTER_CHARM_NAME}{tester_suffix}"
+        tester = f"{TESTER_CHARM_NAME}{tester_suffix}"
         await ops_test.model.deploy(charm, application_name=tester)
         for location in ["menu", "documentation"]:
             link_texts = [location]
@@ -142,7 +152,7 @@ async def test_configmap_contents_with_relations(
             )
             expected_links[location].extend(these_links)
 
-        await ops_test.model.relate(constants.CHARM_NAME, tester)
+        await ops_test.model.relate(CHARM_NAME, tester)
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
@@ -171,7 +181,7 @@ async def test_configmap_contents_with_menu_links_from_config(
     # Remove any existing links from config before the test (it simplifies predicting the outcome
     # of the test)
     for location in ["menu", "documentation"]:
-        await ops_test.model.applications[constants.CHARM_NAME].set_config(
+        await ops_test.model.applications[CHARM_NAME].set_config(
             {ADDITIONAL_LINKS_CONFIG_NAME[location]: ""}
         )
 
@@ -214,7 +224,7 @@ async def test_configmap_contents_with_menu_links_from_config(
         expected_links[location].extend(config_links)
 
         config_links_as_dicts = [asdict(link) for link in config_links]
-        await ops_test.model.applications[constants.CHARM_NAME].set_config(
+        await ops_test.model.applications[CHARM_NAME].set_config(
             {ADDITIONAL_LINKS_CONFIG_NAME[location]: yaml.dump(config_links_as_dicts)}
         )
 
@@ -254,7 +264,7 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     for location in ["menu", "documentation"]:
         link_order = [f"{location}-config2"]
 
-        await ops_test.model.applications[constants.CHARM_NAME].set_config(
+        await ops_test.model.applications[CHARM_NAME].set_config(
             {EXTERNAL_LINKS_ORDER_CONFIG_NAME[location]: yaml.dump(link_order)}
         )
 
@@ -281,7 +291,7 @@ async def get_link_texts_from_configmap(lightkube_client, location):
         "quick": "quickLinks",
         "documentation": "documentationItems",
     }
-    configmap = lightkube_client.get(ConfigMap, constants.CONFIGMAP_NAME, namespace="kubeflow")
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
     links = json.loads(configmap.data["links"])[location_map[location]]
     actual_link_text = [item["text"] for item in links]
     return actual_link_text
