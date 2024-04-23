@@ -5,6 +5,6 @@ __pycache__
 *.charm
 geckodriver.log
 .idea
-
+venv
 # vscode 
 .vscode
