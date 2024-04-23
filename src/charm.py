@@ -8,6 +8,7 @@ import logging
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     KubeflowDashboardLinksProvider,
@@ -74,6 +75,7 @@ class KubeflowDashboardOperator(CharmBase):
         self._k8s_resource_handler = None
         self._configmap_handler = None
 
+        self.dashboard_provider = GrafanaDashboardProvider(self)
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(self, [port])
 
