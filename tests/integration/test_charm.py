@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
 
+import aiohttp
 import pytest
 import pytest_asyncio
 import yaml
@@ -16,7 +17,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
 )
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
-from lightkube.resources.core_v1 import ConfigMap
+from lightkube.resources.core_v1 import Service, ConfigMap
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
@@ -53,6 +54,7 @@ async def lightkube_client():
     yield lightkube_client
 
 
+@pytest.mark.setup
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -73,6 +75,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
 
+@pytest.mark.setup
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
@@ -85,12 +88,13 @@ async def test_add_profile_relation(ops_test: OpsTest):
         timeout=600,
     )
 
-
+@pytest.mark.setup    
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
-
+    
+@pytest.mark.setup
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
@@ -117,6 +121,7 @@ def test_configmap_contents_no_relations_or_config(
     )
 
 
+@pytest.mark.setup    
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
@@ -165,6 +170,7 @@ async def test_configmap_contents_with_relations(
         assert len(links) == starting_n_links[location] + len(expected_links[location])
 
 
+@pytest.mark.setup
 @pytest.mark.asyncio
 async def test_configmap_contents_with_menu_links_from_config(
     ops_test: OpsTest, lightkube_client: Client
@@ -242,6 +248,7 @@ async def test_configmap_contents_with_menu_links_from_config(
         ), f"unexpected number of links at {location}"
 
 
+@pytest.mark.setup        
 @pytest.mark.asyncio
 async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
     """Tests that, if we add a link order, the configmap contents update as expected.
@@ -315,3 +322,18 @@ async def assert_links_in_configmap_by_text_value(
         assert item.text in links_texts
 
     return links_texts
+
+
+@pytest.mark.asyncio
+async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
+    namespace = ops_test.model_name
+    application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
+    config = await ops_test.model.applications[CHARM_NAME].get_config()
+    application_port = config['port']['value']
+    url = "http://" + str(application_ip) + ":" + str(application_port)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=None) as response:
+            result_status = response.status
+            result_text = await response.text()
+    assert result_status == 200
