@@ -56,7 +56,6 @@ async def lightkube_client():
     yield lightkube_client
 
 
-@pytest.mark.setup
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -77,7 +76,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
 
-@pytest.mark.setup
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
@@ -92,13 +90,12 @@ async def test_add_profile_relation(ops_test: OpsTest):
         timeout=600,
     )
 
-@pytest.mark.setup    
+    
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
     
-@pytest.mark.setup
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
@@ -125,7 +122,6 @@ def test_configmap_contents_no_relations_or_config(
     )
 
 
-@pytest.mark.setup    
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
@@ -174,7 +170,6 @@ async def test_configmap_contents_with_relations(
         assert len(links) == starting_n_links[location] + len(expected_links[location])
 
 
-@pytest.mark.setup
 @pytest.mark.asyncio
 async def test_configmap_contents_with_menu_links_from_config(
     ops_test: OpsTest, lightkube_client: Client
@@ -252,7 +247,6 @@ async def test_configmap_contents_with_menu_links_from_config(
         ), f"unexpected number of links at {location}"
 
 
-@pytest.mark.setup        
 @pytest.mark.asyncio
 async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
     """Tests that, if we add a link order, the configmap contents update as expected.
