@@ -86,12 +86,12 @@ async def test_add_profile_relation(ops_test: OpsTest):
         timeout=600,
     )
 
-    
+
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
-    
+
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
