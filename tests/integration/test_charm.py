@@ -17,7 +17,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
 )
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
-from lightkube.resources.core_v1 import Service, ConfigMap
+from lightkube.resources.core_v1 import ConfigMap, Service
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
