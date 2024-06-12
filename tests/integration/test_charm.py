@@ -327,7 +327,7 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     namespace = ops_test.model_name
     application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
     config = await ops_test.model.applications[CHARM_NAME].get_config()
-    application_port = config['port']['value']
+    application_port = config["port"]["value"]
     url = "http://" + str(application_ip) + ":" + str(application_port)
 
     async with aiohttp.ClientSession() as session:
