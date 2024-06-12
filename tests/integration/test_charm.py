@@ -322,13 +322,16 @@ async def assert_links_in_configmap_by_text_value(
     return links_texts
 
 
-@pytest.mark.asyncio
 async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
+    """Tests that the dashboard is accessible by sending an HTTP request to the
+    kubeflow-dashboard URL and checking the HTTP status code.
+    """
     namespace = ops_test.model_name
     application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
-    config = await ops_test.model.applications[CHARM_NAME].get_config()
-    application_port = config["port"]["value"]
-    url = "http://" + str(application_ip) + ":" + str(application_port)
+    application_port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"][
+        "value"
+    ]
+    url = f"http://{str(application_ip)}:{str(application_port)}"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=None) as response:
