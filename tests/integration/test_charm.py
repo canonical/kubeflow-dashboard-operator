@@ -40,6 +40,7 @@ DEFAULT_DOCUMENTATION_TEXTS = [
 ]
 
 
+@pytest.mark.setup
 @pytest.fixture(scope="module")
 def copy_libraries_into_tester_charm() -> None:
     """Ensure that the tester charms use the current libraries."""
@@ -48,12 +49,14 @@ def copy_libraries_into_tester_charm() -> None:
     shutil.copyfile(lib.as_posix(), (DASHBOARD_LINKS_REQUIRER_TESTER_CHARM / lib).as_posix())
 
 
+@pytest.mark.setup
 @pytest_asyncio.fixture
 async def lightkube_client():
     lightkube_client = Client(field_manager="test")
     yield lightkube_client
 
 
+@pytest.mark.setup    
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -74,6 +77,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
 
+@pytest.mark.setup
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
@@ -87,11 +91,13 @@ async def test_add_profile_relation(ops_test: OpsTest):
     )
 
 
+@pytest.mark.setup    
 @pytest.mark.asyncio
 async def test_status(ops_test: OpsTest):
     assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "active"
 
 
+@pytest.mark.setup    
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
@@ -118,6 +124,7 @@ def test_configmap_contents_no_relations_or_config(
     )
 
 
+@pytest.mark.setup    
 @pytest.mark.asyncio
 async def test_configmap_contents_with_relations(
     ops_test: OpsTest, copy_libraries_into_tester_charm, lightkube_client: Client
@@ -166,6 +173,7 @@ async def test_configmap_contents_with_relations(
         assert len(links) == starting_n_links[location] + len(expected_links[location])
 
 
+@pytest.mark.setup        
 @pytest.mark.asyncio
 async def test_configmap_contents_with_menu_links_from_config(
     ops_test: OpsTest, lightkube_client: Client
@@ -243,6 +251,7 @@ async def test_configmap_contents_with_menu_links_from_config(
         ), f"unexpected number of links at {location}"
 
 
+@pytest.mark.setup        
 @pytest.mark.asyncio
 async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_client: Client):
     """Tests that, if we add a link order, the configmap contents update as expected.
@@ -320,16 +329,23 @@ async def assert_links_in_configmap_by_text_value(
 
 async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     """Tests that the dashboard is accessible by sending an HTTP request to the
-    kubeflow-dashboard URL and checking the HTTP status code.
+    kubeflow-dashboard URL and checking the HTTP status code and the response
+    text.
     """
     namespace = ops_test.model_name
     application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
     application_port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"][
         "value"
     ]
+    # The URL to access the central dashboard, in this case kubeflow-dashboard's
+    # IP + the port specified in the configuration
     url = f"http://{str(application_ip)}:{str(application_port)}"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=None) as response:
             result_status = response.status
+            result_text = str(await response.text())
+    # Assert that we receive the expected status code
     assert result_status == 200
+    # And that the title is the one expected
+    assert "<title>Kubeflow Central Dashboard</title>" in result_text
