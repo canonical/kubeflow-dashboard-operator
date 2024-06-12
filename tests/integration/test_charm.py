@@ -333,5 +333,4 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=None) as response:
             result_status = response.status
-            result_text = await response.text()
     assert result_status == 200
