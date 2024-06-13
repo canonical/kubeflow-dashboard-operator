@@ -320,7 +320,7 @@ async def assert_links_in_configmap_by_text_value(
 
 async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     """Tests that the dashboard is accessible by sending an HTTP request to the
-    kubeflow-dashboard URL and checking the HTTP status code and the response
+    kubeflow-dashboard Service IP and checking the HTTP status code and the response
     text.
     """
     namespace = ops_test.model_name
