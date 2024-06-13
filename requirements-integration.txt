@@ -313,7 +313,7 @@ websocket-client==1.6.2
     # via
     #   kubernetes
     #   ops
-websockets
+websockets==8.1
     # via juju
 wsproto==1.2.0
     # via
