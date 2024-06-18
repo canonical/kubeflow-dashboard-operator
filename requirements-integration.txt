@@ -42,10 +42,14 @@ cffi==1.15.1
     # via
     #   cryptography
     #   pynacl
-charmed-kubeflow-chisme==0.2.0
-    # via -r requirements.in
+charmed-kubeflow-chisme==0.4.0
+    # via
+    #   -r requirements-integration.in
+    #   -r requirements.in
 charset-normalizer==3.2.0
     # via requests
+cosl==0.0.12
+    # via -r requirements.in
 cryptography==41.0.3
     # via
     #   paramiko
@@ -114,6 +118,7 @@ jsonschema==4.17.3
 juju==3.2.2
     # via
     #   -r requirements-integration.in
+    #   charmed-kubeflow-chisme
     #   pytest-operator
 kaitaistruct==0.10
     # via selenium-wire
@@ -147,6 +152,7 @@ ops==2.6.0
     #   -r requirements-integration.in
     #   -r requirements.in
     #   charmed-kubeflow-chisme
+    #   cosl
     #   serialized-data-interface
 ordered-set==4.1.0
     # via deepdiff
@@ -228,6 +234,7 @@ pyyaml==6.0.1
     # via
     #   -r requirements-integration.in
     #   -r requirements.in
+    #   cosl
     #   juju
     #   kubernetes
     #   lightkube
@@ -247,7 +254,7 @@ rsa==4.9
     # via google-auth
 ruamel-yaml==0.17.32
     # via charmed-kubeflow-chisme
-ruamel-yaml-clib==0.2.7
+ruamel-yaml-clib==0.2.8
     # via ruamel-yaml
 selenium==4.12.0
     # via
@@ -298,6 +305,7 @@ trio-websocket==0.10.4
     # via selenium
 typing-extensions==4.7.1
     # via
+    #   cosl
     #   ipython
     #   typing-inspect
 typing-inspect==0.9.0

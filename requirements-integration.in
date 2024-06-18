@@ -9,6 +9,8 @@ pytest-operator
 pyyaml
 selenium
 selenium-wire
+# This is required due to the abstraction of cos integration
+charmed-kubeflow-chisme>=0.4.0
 # This is needed only for this charm as the integration test files in
 # test/integration/ have imports from the charm code in src/charm.py
 -r requirements.in
