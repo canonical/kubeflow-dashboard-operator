@@ -11,6 +11,11 @@ import aiohttp
 import pytest
 import pytest_asyncio
 import yaml
+from charmed_kubeflow_chisme.testing import (
+    GRAFANA_AGENT_APP,
+    assert_logging,
+    deploy_and_assert_grafana_agent,
+)
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     DashboardLink,
@@ -32,6 +37,7 @@ DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
+TESTER_CHARMS = [f"{TESTER_CHARM_NAME}{suffix}" for suffix in ["1", "2"]]
 
 DEFAULT_DOCUMENTATION_TEXTS = [
     "Getting started with Charmed Kubeflow",
@@ -73,12 +79,17 @@ async def test_build_and_deploy(ops_test: OpsTest):
         == "Add required relation to kubeflow-profiles"
     )
 
+    # Deploying grafana-agent-k8s and add all relations
+    await deploy_and_assert_grafana_agent(
+        ops_test.model, CHARM_NAME, metrics=False, dashboard=False, logging=True
+    )
+
 
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
     await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
-    await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
+    await ops_test.model.integrate(PROFILES_CHARM_NAME, CHARM_NAME)
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
         status="active",
@@ -138,8 +149,7 @@ async def test_configmap_contents_with_relations(
 
     expected_links = {name: [] for name in DASHBOARD_LINK_LOCATIONS}
 
-    for tester_suffix in ["1", "2"]:
-        tester = f"{TESTER_CHARM_NAME}{tester_suffix}"
+    for tester in TESTER_CHARMS:
         await ops_test.model.deploy(charm, application_name=tester)
         for location in ["menu", "documentation"]:
             link_texts = [location]
@@ -149,12 +159,13 @@ async def test_configmap_contents_with_relations(
             )
             expected_links[location].extend(these_links)
 
-        await ops_test.model.relate(CHARM_NAME, tester)
+        await ops_test.model.integrate(CHARM_NAME, tester)
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -184,8 +195,9 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -227,8 +239,9 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -267,8 +280,9 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -340,3 +354,9 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     assert result_status == 200
     # And that the title is the one expected
     assert "<title>Kubeflow Central Dashboard</title>" in result_text
+
+
+async def test_logging(ops_test: OpsTest):
+    """Test logging is defined in relation data bag."""
+    app = ops_test.model.applications[GRAFANA_AGENT_APP]
+    await assert_logging(app)

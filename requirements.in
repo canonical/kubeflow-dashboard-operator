@@ -5,3 +5,5 @@ lightkube
 ops
 pyyaml
 serialized-data-interface
+# from loki_k8s.v1.loki_push_api.py
+cosl
