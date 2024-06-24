@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
 
+import aiohttp
 import pytest
 import pytest_asyncio
 import yaml
@@ -16,7 +17,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
 )
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
-from lightkube.resources.core_v1 import ConfigMap
+from lightkube.resources.core_v1 import ConfigMap, Service
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
@@ -319,3 +320,27 @@ async def assert_links_in_configmap_by_text_value(
         assert item.text in links_texts
 
     return links_texts
+
+
+async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
+    """Tests that the dashboard is accessible by sending an HTTP request to the
+    kubeflow-dashboard Service IP and checking the HTTP status code and the response
+    text.
+    """
+    namespace = ops_test.model_name
+    application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
+    application_port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"][
+        "value"
+    ]
+    # The URL to access the central dashboard, in this case kubeflow-dashboard's
+    # IP + the port specified in the configuration
+    url = f"http://{str(application_ip)}:{str(application_port)}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=None) as response:
+            result_status = response.status
+            result_text = str(await response.text())
+    # Assert that we receive the expected status code
+    assert result_status == 200
+    # And that the title is the one expected
+    assert "<title>Kubeflow Central Dashboard</title>" in result_text
