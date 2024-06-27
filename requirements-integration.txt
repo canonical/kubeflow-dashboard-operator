@@ -44,7 +44,7 @@ cffi==1.15.1
     # via
     #   cryptography
     #   pynacl
-charmed-kubeflow-chisme==0.4.0
+charmed-kubeflow-chisme==0.4.1
     # via
     #   -r requirements-integration.in
     #   -r requirements.in
