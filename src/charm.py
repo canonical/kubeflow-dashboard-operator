@@ -63,7 +63,7 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
-        self._service = "npm start"
+        self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
