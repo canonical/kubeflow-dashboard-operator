@@ -336,6 +336,32 @@ class TestRequirer:
 
         assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
 
+    def test_send_dashboard_links_on_upgrade_charm(self):
+        """Test that the Requirer correctly handles the upgrade charm event."""
+        # Arrange
+        other_app = "provider"
+        harness = Harness(DummyRequirerCharm, meta=DUMMY_REQUIRER_METADATA)
+        harness.set_leader(True)
+        harness.begin()
+
+        # Act
+
+        # Disable hooks to prevent relation_created handler from updating the relation data
+        harness.disable_hooks()
+
+        relation_id = harness.add_relation(relation_name=RELATION_NAME, remote_app=other_app)
+
+        harness.enable_hooks()
+
+        harness.charm.on.upgrade_charm.emit()
+
+        # Assert
+        actual_sidebar_items = get_sidebar_items_from_relation(
+            harness, relation_id, harness.model.app
+        )
+
+        assert actual_sidebar_items == REQUIRER_DASHBOARD_LINKS
+
     def test_send_dashboard_links_without_leadership(self):
         """Tests whether library incorrectly sends sidebar data when unit is not leader."""
         # Arrange
