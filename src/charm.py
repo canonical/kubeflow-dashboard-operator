@@ -170,6 +170,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": self._service,
                     "startup": "enabled",
+                    "working_dir": "/usr/src/app",
                     "environment": {
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
