@@ -65,8 +65,8 @@ class KubeflowDashboardOperator(CharmBase):
         self._name = self.model.app.name
         # Remove tini when using the rock
         # Uncomment when using the rock and remove the line below
-        # self._service = "npm start"
-        self._service = "/sbin/tini -- npm start"
+        self._service = "npm start"
+        # self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
@@ -166,7 +166,7 @@ class KubeflowDashboardOperator(CharmBase):
             "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
                 self._container_name: {
-                    "override": "replace",
+                    "override": "merge",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": self._service,
                     "startup": "enabled",
