@@ -63,10 +63,10 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
-        # Remove tini when using the rock
-        # Uncomment when using the rock and remove the line below
-        # self._service = "npm start"
-        self._service = "/sbin/tini -- npm start"
+        # Uncomment the line below when using the rock and comment the next one
+        self._service = "npm start"
+        # Uncomment the line below when using upstream image and comment the one above
+        # self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
