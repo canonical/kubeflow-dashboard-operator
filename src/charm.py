@@ -64,8 +64,8 @@ class KubeflowDashboardOperator(CharmBase):
         self._profiles_service = None
         self._name = self.model.app.name
         # Uncomment the line below when using the rock and comment the next one
+        # and vice versa when using the upstream image
         self._service = "npm start"
-        # Uncomment the line below when using upstream image and comment the one above
         # self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
