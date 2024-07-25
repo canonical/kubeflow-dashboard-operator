@@ -161,7 +161,7 @@ class KubeflowDashboardOperator(CharmBase):
             "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
                 self._container_name: {
-                    "override": "replace",
+                    "override": "merge",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": self._service,
                     "startup": "enabled",
