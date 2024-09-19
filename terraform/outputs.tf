@@ -4,15 +4,15 @@ output "app_name" {
 
 output "provides" {
   value = {
-    links = "links",
+    links             = "links",
     grafana_dashboard = "grafana-dashboard"
   }
 }
 
 output "requires" {
   value = {
-    ingress = "ingress",
+    ingress           = "ingress",
     kubeflow_profiles = "kubeflow-profiles",
-    logging = "logging"
+    logging           = "logging"
   }
 }
