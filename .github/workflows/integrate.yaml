@@ -28,6 +28,14 @@ jobs:
 
     - name: Lint code
       run: tox -e lint
+  
+  terraform-checks:
+    name: Terraform
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
+    with:
+      charm-path: .
+      model: kubeflow
+      channel: latest/edge
 
   unit:
     name: Unit Test
