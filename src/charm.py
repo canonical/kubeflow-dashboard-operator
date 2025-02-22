@@ -65,8 +65,8 @@ class KubeflowDashboardOperator(CharmBase):
         self._name = self.model.app.name
         # Uncomment the line below when using the rock and comment the next one
         # and vice versa when using the upstream image
-        self._service = "npm start"
-        # self._service = "/sbin/tini -- npm start"
+        # self._service = "npm start"
+        self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
@@ -180,6 +180,7 @@ class KubeflowDashboardOperator(CharmBase):
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
                         "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698  # noqa E501
+                        "COLLECT_METRICS": "true",
                     },
                 }
             },
