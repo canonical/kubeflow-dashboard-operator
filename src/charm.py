@@ -180,7 +180,6 @@ class KubeflowDashboardOperator(CharmBase):
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
                         "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698  # noqa E501
-                        "COLLECT_METRICS": "true",
                     },
                 }
             },
