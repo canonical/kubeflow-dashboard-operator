@@ -12,7 +12,8 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: docker.io/kubeflownotebookswg/centraldashboard:v1.8.0
+    # On using the ROCK, modify the service command in the charm.py to remove tini
+    upstream-source: docker.io/charmedkubeflow/centraldashboard:1.10.0-rc.1-a69c851
 provides:
   links:
     interface: kubeflow_dashboard_links
@@ -75,3 +76,6 @@ requires:
           - service-port
     versions: [v1]
     __schema_source: https://raw.githubusercontent.com/canonical/operator-schemas/master/k8s-service.yaml
+  logging:
+    interface: loki_push_api
+    optional: true

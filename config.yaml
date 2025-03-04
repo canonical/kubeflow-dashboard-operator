@@ -40,7 +40,7 @@ options:
     description: Whether to enable the registration flow on sign-in
   menu-link-order:
     type: string
-    default: '["Notebooks", "Experiments (AutoML)", "Experiments (KFP)", "Pipelines", "Runs", "Recurring Runs", "Volumes", "Tensorboards"]'
+    default: '["Notebooks", "TensorBoards", "Volumes", "Katib Experiments", "Pipelines", "Experiments (KFP)", "Runs", "Recurring Runs", "Artifacts", "Executions"]'
     description: >
       YAML or JSON formatted list of strings defining the order of the menu links in the dashboard sidebar.  
       For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
@@ -52,7 +52,7 @@ options:
       For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
   quick-link-order:
     type: string
-    default: '["Upload a pipeline","View all pipeline runs","Create a new Notebook server","View Katib Experiments"]'
+    default: '["Create a new Notebook server", "Upload a Pipeline", "View Pipeline Runs"]'
     description: >
       YAML or JSON formatted list of strings defining the order of the quick links in the dashboard sidebar.  
       For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.

@@ -21,13 +21,19 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install dependencies
       run: sudo apt install tox
 
     - name: Lint code
       run: tox -e lint
+  
+  terraform-checks:
+    name: Terraform
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
+    with:
+      charm-path: .
 
   unit:
     name: Unit Test
@@ -35,7 +41,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install dependencies
       run: sudo apt install tox
@@ -48,15 +54,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
-            channel: 1.25-strict/stable
+            channel: 1.31-strict/stable
             microk8s-addons: "dns hostpath-storage rbac ingress metallb:10.64.140.43-10.64.140.49"
-            juju-channel: 3.5/stable
-            charmcraft-channel: latest/candidate
+            juju-channel: 3.6/stable
+            charmcraft-channel: 3.x/stable
 
       - name: Install Chrome driver
         run: |
@@ -79,7 +85,7 @@ jobs:
         if: always()
 
       - name: Upload selenium screenshots
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: selenium-screenshots
           path: /tmp/selenium-*.png

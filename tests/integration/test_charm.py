@@ -7,16 +7,22 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
 
+import aiohttp
 import pytest
 import pytest_asyncio
 import yaml
+from charmed_kubeflow_chisme.testing import (
+    GRAFANA_AGENT_APP,
+    assert_logging,
+    deploy_and_assert_grafana_agent,
+)
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     DashboardLink,
 )
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
-from lightkube.resources.core_v1 import ConfigMap
+from lightkube.resources.core_v1 import ConfigMap, Service
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
@@ -31,6 +37,7 @@ DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
 ).absolute()
 TESTER_CHARM_NAME = "kubeflow-dashboard-requirer-tester"
+TESTER_CHARMS = [f"{TESTER_CHARM_NAME}{suffix}" for suffix in ["1", "2"]]
 
 DEFAULT_DOCUMENTATION_TEXTS = [
     "Getting started with Charmed Kubeflow",
@@ -65,6 +72,11 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
     await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
 
+    # Deploying grafana-agent-k8s and add all relations
+    await deploy_and_assert_grafana_agent(
+        ops_test.model, CHARM_NAME, metrics=False, dashboard=False, logging=True
+    )
+    
     # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
@@ -125,8 +137,7 @@ async def test_configmap_contents_with_relations(
 
     expected_links = {name: [] for name in DASHBOARD_LINK_LOCATIONS}
 
-    for tester_suffix in ["1", "2"]:
-        tester = f"{TESTER_CHARM_NAME}{tester_suffix}"
+    for tester in TESTER_CHARMS:
         await ops_test.model.deploy(charm, application_name=tester)
         for location in ["menu", "documentation"]:
             link_texts = [location]
@@ -136,12 +147,13 @@ async def test_configmap_contents_with_relations(
             )
             expected_links[location].extend(these_links)
 
-        await ops_test.model.relate(CHARM_NAME, tester)
+        await ops_test.model.integrate(CHARM_NAME, tester)
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -171,8 +183,9 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -214,8 +227,9 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -254,8 +268,9 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
+        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
         raise_on_error=True,
-        raise_on_blocked=True,
+        raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
         timeout=150,
     )
@@ -303,3 +318,33 @@ async def assert_links_in_configmap_by_text_value(
         assert item.text in links_texts
 
     return links_texts
+
+
+async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
+    """Tests that the dashboard is accessible by sending an HTTP request to the
+    kubeflow-dashboard Service IP and checking the HTTP status code and the response
+    text.
+    """
+    namespace = ops_test.model_name
+    application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
+    application_port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"][
+        "value"
+    ]
+    # The URL to access the central dashboard, in this case kubeflow-dashboard's
+    # IP + the port specified in the configuration
+    url = f"http://{str(application_ip)}:{str(application_port)}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=None) as response:
+            result_status = response.status
+            result_text = str(await response.text())
+    # Assert that we receive the expected status code
+    assert result_status == 200
+    # And that the title is the one expected
+    assert "<title>Kubeflow Central Dashboard</title>" in result_text
+
+
+async def test_logging(ops_test: OpsTest):
+    """Test logging is defined in relation data bag."""
+    app = ops_test.model.applications[GRAFANA_AGENT_APP]
+    await assert_logging(app)

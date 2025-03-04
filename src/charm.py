@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 import json
@@ -13,6 +13,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     KubeflowDashboardLinksProvider,
 )
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
@@ -62,7 +63,10 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
+        # Uncomment the line below when using the rock and comment the next one
+        # and vice versa when using the upstream image
         self._service = "npm start"
+        # self._service = "/sbin/tini -- npm start"
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
@@ -93,6 +97,7 @@ class KubeflowDashboardOperator(CharmBase):
             relation_name=DASHBOARD_LINKS_RELATION_NAME,
         )
         self.framework.observe(self.dashboard_link_provider.on.updated, self.main)
+        self._logging = LogForwarder(charm=self)
 
     @property
     def profiles_service(self):
@@ -161,7 +166,7 @@ class KubeflowDashboardOperator(CharmBase):
             "description": "pebble config layer for kubeflow_dashboard_operator",
             "services": {
                 self._container_name: {
-                    "override": "replace",
+                    "override": "merge",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
                     "command": self._service,
                     "startup": "enabled",
@@ -169,10 +174,12 @@ class KubeflowDashboardOperator(CharmBase):
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
-                        "REGISTRATION_FLOW": self._registration_flow,
+                        "REGISTRATION_FLOW": str(
+                            self._registration_flow
+                        ).lower(),  # convert to a string because the applied layer will have it  # noqa E501
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
-                        "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698   # noqa E501
+                        "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698  # noqa E501
                     },
                 }
             },
@@ -226,6 +233,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "rewrite": "/",
                     "service": self.model.app.name,
                     "port": self._port,
+                    "namespace": self._namespace,
                 }
             )
 
