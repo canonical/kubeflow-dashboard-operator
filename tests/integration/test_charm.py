@@ -369,7 +369,7 @@ async def test_metrics_enpoint(ops_test):
     """
     app = ops_test.model.applications[CHARM_NAME]
     port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"]["value"]
-    await assert_metrics_endpoint(app, port=port, metrics_path="/prometheus/metrics")
+    await assert_metrics_endpoint(app, metrics_port=port, metrics_path="/prometheus/metrics")
 
 
 async def test_logging(ops_test: OpsTest):
