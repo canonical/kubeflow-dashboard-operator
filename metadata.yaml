@@ -17,6 +17,8 @@ resources:
 provides:
   links:
     interface: kubeflow_dashboard_links
+  metrics-endpoint:
+    interface: prometheus_scrape
   grafana-dashboard:
     interface: grafana_dashboard
 requires:

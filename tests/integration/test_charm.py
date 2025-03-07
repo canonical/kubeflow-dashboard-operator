@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 import json
+import logging
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -13,8 +13,11 @@ import pytest_asyncio
 import yaml
 from charmed_kubeflow_chisme.testing import (
     GRAFANA_AGENT_APP,
+    assert_grafana_dashboards,
     assert_logging,
+    assert_metrics_endpoint,
     deploy_and_assert_grafana_agent,
+    get_grafana_dashboards,
 )
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
@@ -44,6 +47,8 @@ DEFAULT_DOCUMENTATION_TEXTS = [
     "Microk8s for Kubeflow",
     "Requirements for Kubeflow",
 ]
+
+log = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
@@ -81,7 +86,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
-        ops_test.model, CHARM_NAME, metrics=False, dashboard=False, logging=True
+        ops_test.model, CHARM_NAME, metrics=True, dashboard=True, logging=True
     )
 
 
@@ -356,7 +361,26 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     assert "<title>Kubeflow Central Dashboard</title>" in result_text
 
 
+async def test_metrics_enpoint(ops_test):
+    """Test metrics_endpoints are defined in relation data bag and their accessibility.
+    This function gets all the metrics_endpoints from the relation data bag, checks if
+    they are available from the grafana-agent-k8s charm and finally compares them with the
+    ones provided to the function.
+    """
+    app = ops_test.model.applications[CHARM_NAME]
+    port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"]["value"]
+    await assert_metrics_endpoint(app, port=port, metrics_path="/prometheus/metrics")
+
+
 async def test_logging(ops_test: OpsTest):
     """Test logging is defined in relation data bag."""
     app = ops_test.model.applications[GRAFANA_AGENT_APP]
     await assert_logging(app)
+
+
+async def test_grafana_dashboards(ops_test: OpsTest):
+    """Test Grafana dashboards are defined in relation data bag."""
+    app = ops_test.model.applications[CHARM_NAME]
+    dashboards = get_grafana_dashboards()
+    log.info("found dashboards: %s", dashboards)
+    await assert_grafana_dashboards(app, dashboards)

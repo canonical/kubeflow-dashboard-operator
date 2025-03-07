@@ -1,0 +1,35 @@
+groups:
+- name: KubeflowDashboardRequests
+  rules:
+  - alert: HighRequestRate
+    expr: sum(rate(rest_http_request_total[2m])) > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High per-second request rate detected"
+      description: |
+       The total request rate is over 1000 requests per second over the last 5 minutes on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
+       LABELS = {{ $labels }}
+
+  - alert: HighErrorRequestRate
+    expr: sum(rate(rest_http_request_total{status!~"2.."}[2m])) / sum(rate(rest_http_request_total[2m])) > 0.1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "More than 10% of request responses are unsuccessful"
+      description: |
+        At least 10% of requests received unsuccessful responses (status code!=2xx) over the last 5 minutes on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
+        LABELS = {{ $labels }}
+
+  - alert: SlowResponseTimeAtRootPath
+    expr: histogram_quantile(0.95, sum by (le) (rate(rest_http_request_duration_seconds_bucket{}[2m]))) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Slow response time detected"
+      description: |
+        95th percentile of requests' time is greater than 1 second on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
+        LABELS = {{ $labels }}
