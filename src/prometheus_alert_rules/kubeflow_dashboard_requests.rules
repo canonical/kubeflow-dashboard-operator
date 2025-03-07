@@ -13,14 +13,14 @@ groups:
        LABELS = {{ $labels }}
 
   - alert: HighErrorRequestRate
-    expr: sum(rate(rest_http_request_total{status!~"2.."}[2m])) / sum(rate(rest_http_request_total[2m])) > 0.1
+    expr: sum(rate(rest_http_request_total{status=~"[4-5].*"}[2m])) / sum(rate(rest_http_request_total[2m])) > 0.1
     for: 5m
     labels:
       severity: critical
     annotations:
       summary: "More than 10% of request responses are unsuccessful"
       description: |
-        At least 10% of requests received unsuccessful responses (status code!=2xx) over the last 5 minutes on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
+        At least 10% of requests received unsuccessful responses (status code=4/5xx) over the last 5 minutes on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
         LABELS = {{ $labels }}
 
   - alert: SlowResponseTimeAtRootPath
