@@ -22,7 +22,6 @@
         "hide": false,
         "iconColor": "#B877D9",
         "name": "Node.js Start",
-        "showIn": 0,
         "textFormat": "{{instance}}",
         "titleFormat": "Node.js Start",
         "useValueForTime": true
