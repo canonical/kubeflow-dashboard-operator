@@ -56,14 +56,14 @@
                 "tooltip": false,
                 "viz": false
               },
-              "lineInterpolation": "smooth",
-              "lineWidth": 2,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
               },
-              "showPoints": "auto",
-              "spanNulls": true,
+              "showPoints": "never",
+              "spanNulls": false,
               "stacking": {
                 "group": "A",
                 "mode": "none"
@@ -210,14 +210,14 @@
                 "tooltip": false,
                 "viz": false
               },
-              "lineInterpolation": "smooth",
-              "lineWidth": 2,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
               },
-              "showPoints": "auto",
-              "spanNulls": true,
+              "showPoints": "never",
+              "spanNulls": false,
               "stacking": {
                 "group": "A",
                 "mode": "none"
@@ -301,14 +301,14 @@
                 "tooltip": false,
                 "viz": false
               },
-              "lineInterpolation": "smooth",
-              "lineWidth": 2,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
               },
-              "showPoints": "auto",
-              "spanNulls": true,
+              "showPoints": "never",
+              "spanNulls": false,
               "stacking": {
                 "group": "A",
                 "mode": "none"
@@ -393,13 +393,13 @@
                 "tooltip": false,
                 "viz": false
               },
-              "lineInterpolation": "smooth",
-              "lineWidth": 2,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
               },
-              "showPoints": "auto",
+              "showPoints": "never",
               "spanNulls": false,
               "stacking": {
                 "group": "A",
@@ -423,7 +423,7 @@
                 }
               ]
             },
-            "unit": "s"
+            "unit": "percentunit"
           },
           "overrides": []
         },
@@ -450,15 +450,25 @@
         },
         "targets": [
           {
-            "datasource": "${prometheusds}",
-            "editorMode": "code",
-            "expr": "rate(process_cpu_seconds_total{app=\"kubeflow-centraldashboard\",}[2m])",
-            "legendFormat": "CPU usage per second",
-            "range": true,
+            "expr": "irate(process_cpu_user_seconds_total{app=\"kubeflow-centraldashboard\"}[2m]) * 100",
+            "interval": "",
+            "legendFormat": "User CPU",
             "refId": "A"
+          },
+          {
+            "expr": "irate(process_cpu_system_seconds_total{app=\"kubeflow-centraldashboard\"}[2m]) * 100",
+            "interval": "",
+            "legendFormat": "System CPU",
+            "refId": "B"
+          },
+          {
+            "expr": "irate(process_cpu_seconds_total{app=\"kubeflow-centraldashboard\"}[2m]) * 100",
+            "interval": "",
+            "legendFormat": "Total CPU",
+            "refId": "C"
           }
         ],
-        "title": "CPU usage per second",
+        "title": "CPU usage",
         "type": "timeseries"
       },
       {
@@ -482,14 +492,14 @@
                 "tooltip": false,
                 "viz": false
               },
-              "lineInterpolation": "smooth",
-              "lineWidth": 2,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
               },
-              "showPoints": "auto",
-              "spanNulls": true,
+              "showPoints": "never",
+              "spanNulls": false,
               "stacking": {
                 "group": "A",
                 "mode": "none"
@@ -542,18 +552,36 @@
             "datasource": "${prometheusds}",
             "editorMode": "code",
             "expr": "process_resident_memory_bytes{app=\"kubeflow-centraldashboard\",}",
-            "legendFormat": "Resident Memory",
+            "legendFormat": "Process Memory",
             "range": true,
             "refId": "A"
           },
           {
             "datasource": "${prometheusds}",
             "editorMode": "code",
-            "expr": "process_virtual_memory_bytes{app=\"kubeflow-centraldashboard\",}",
+            "expr": "nodejs_heap_size_total_bytes{app=\"kubeflow-centraldashboard\",}",
             "hide": false,
-            "legendFormat": "Virtual Memory",
+            "legendFormat": "Heap Total",
             "range": true,
             "refId": "B"
+          },
+          {
+            "datasource": "${prometheusds}",
+            "editorMode": "code",
+            "expr": "nodejs_heap_size_used_bytes{app=\"kubeflow-centraldashboard\",}",
+            "hide": false,
+            "legendFormat": "Heap Usad",
+            "range": true,
+            "refId": "C"
+          },
+          {
+            "datasource": "${prometheusds}",
+            "editorMode": "code",
+            "expr": "nodejs_external_memory_bytes{app=\"kubeflow-centraldashboard\",}",
+            "hide": false,
+            "legendFormat": "External Memory",
+            "range": true,
+            "refId": "D"
           }
         ],
         "title": "Memory",
@@ -594,7 +622,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -690,7 +718,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -786,7 +814,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -884,7 +912,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -982,7 +1010,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -1045,7 +1073,7 @@
             "$$hashKey": "object:1079",
             "datasource": "${prometheusds}",
             "editorMode": "code",
-            "expr": "increase(rest_http_request_duration_seconds_bucket{app=\"kubeflow-centraldashboard\",le=\"0.25\"}[2m]) / ignoring(le) increase(rest_http_request_duration_seconds_count{app=\"kubeflow-centraldashboard\",}[2m])",
+            "expr": "increase(rest_http_request_duration_seconds_bucket{app=\"kubeflow-centraldashboard\",le=\"0.5\"}[2m]) / ignoring(le) increase(rest_http_request_duration_seconds_count{app=\"kubeflow-centraldashboard\",}[2m])",
             "format": "time_series",
             "instant": false,
             "interval": "",
@@ -1054,7 +1082,7 @@
             "refId": "A"
           }
         ],
-        "title": "Requests under 250ms",
+        "title": "Requests under 500ms",
         "type": "timeseries"
       },
       {
@@ -1082,7 +1110,7 @@
               "lineStyle": {
                 "fill": "solid"
               },
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -1195,7 +1223,7 @@
                 "viz": false
               },
               "lineInterpolation": "linear",
-              "lineWidth": 2,
+              "lineWidth": 1,
               "pointSize": 5,
               "scaleDistribution": {
                 "type": "linear"
@@ -1295,158 +1323,6 @@
     ],
     "templating": {
       "list": [
-        {
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "hide": 0,
-          "includeAll": true,
-          "label": "Loki datasource",
-          "multi": true,
-          "name": "lokids",
-          "options": [],
-          "query": "loki",
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "type": "datasource"
-        },
-        {
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "hide": 0,
-          "includeAll": true,
-          "label": "Prometheus datasource",
-          "multi": true,
-          "name": "prometheusds",
-          "options": [],
-          "query": "prometheus",
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "type": "datasource"
-        },
-        {
-          "allValue": ".*",
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "datasource": "${prometheusds}",
-          "definition": "label_values(up{juju_model=~\"$juju_model\",juju_model_uuid=~\"$juju_model_uuid\",juju_application=~\"$juju_application\"},juju_unit)",
-          "hide": 0,
-          "includeAll": true,
-          "label": "Juju unit",
-          "multi": true,
-          "name": "juju_unit",
-          "options": [],
-          "query": {
-            "query": "label_values(up{juju_model=~\"$juju_model\",juju_model_uuid=~\"$juju_model_uuid\",juju_application=~\"$juju_application\"},juju_unit)",
-            "refId": "StandardVariableQuery"
-          },
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "sort": 0,
-          "tagValuesQuery": "",
-          "tags": [],
-          "tagsQuery": "",
-          "type": "query",
-          "useTags": false
-        },
-        {
-          "allValue": ".*",
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "datasource": "${prometheusds}",
-          "definition": "label_values(up{juju_model=~\"$juju_model\",juju_model_uuid=~\"$juju_model_uuid\"},juju_application)",
-          "hide": 0,
-          "includeAll": true,
-          "label": "Juju application",
-          "multi": true,
-          "name": "juju_application",
-          "options": [],
-          "query": {
-            "query": "label_values(up{juju_model=~\"$juju_model\",juju_model_uuid=~\"$juju_model_uuid\"},juju_application)",
-            "refId": "StandardVariableQuery"
-          },
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "sort": 0,
-          "tagValuesQuery": "",
-          "tags": [],
-          "tagsQuery": "",
-          "type": "query",
-          "useTags": false
-        },
-        {
-          "allValue": ".*",
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "datasource": "${prometheusds}",
-          "definition": "label_values(up{juju_model=~\"$juju_model\"},juju_model_uuid)",
-          "hide": 0,
-          "includeAll": true,
-          "label": "Juju model uuid",
-          "multi": true,
-          "name": "juju_model_uuid",
-          "options": [],
-          "query": {
-            "query": "label_values(up{juju_model=~\"$juju_model\"},juju_model_uuid)",
-            "refId": "StandardVariableQuery"
-          },
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "sort": 0,
-          "tagValuesQuery": "",
-          "tags": [],
-          "tagsQuery": "",
-          "type": "query",
-          "useTags": false
-        },
-        {
-          "allValue": ".*",
-          "current": {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
-          "datasource": "${prometheusds}",
-          "definition": "label_values(up,juju_model)",
-          "hide": 0,
-          "includeAll": true,
-          "label": "Juju model",
-          "multi": true,
-          "name": "juju_model",
-          "options": [],
-          "query": {
-            "query": "label_values(up,juju_model)",
-            "refId": "StandardVariableQuery"
-          },
-          "refresh": 1,
-          "regex": "",
-          "skipUrlSync": false,
-          "sort": 0,
-          "tagValuesQuery": "",
-          "tags": [],
-          "tagsQuery": "",
-          "type": "query",
-          "useTags": false
-        },
         {
           "current": {
             "selected": true,
