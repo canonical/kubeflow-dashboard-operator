@@ -1,7 +1,7 @@
 groups:
 - name: KubeflowDashboardNodejs
   rules:
-  - alert: NodejsDown
+  - alert: NodejsNotRunning
     expr: absent(process_start_time_seconds{app="kubeflow-centraldashboard"})
     for: 5m
     labels:
