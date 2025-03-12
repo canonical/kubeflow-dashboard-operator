@@ -1,0 +1,13 @@
+groups:
+- name: KubeflowDashboardNodejs
+  rules:
+  - alert: NodejsNotRunning
+    expr: absent(process_start_time_seconds{app="kubeflow-centraldashboard"})
+    for: 5m
+    labels:
+        severity: critical
+    annotations:
+        summary: "Node.js is not running"
+        description: |
+          Node.js is not running on unit {{ $labels.juju_model }}/{{ $labels.juju_unit }}.
+          LABELS = {{ $labels }}

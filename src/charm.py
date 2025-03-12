@@ -15,6 +15,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
 )
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
@@ -39,6 +40,7 @@ ADDITIONAL_LINKS_CONFIG_NAME = {
 EXTERNAL_LINKS_ORDER_CONFIG_NAME = {
     location: f"{location}-link-order" for location in DASHBOARD_LINK_LOCATIONS
 }
+METRICS_PATH = "/prometheus/metrics"  # Source https://github.com/kubeflow/kubeflow/blob/master/components/centraldashboard/app/metrics.ts#L36 # noqa E501
 
 
 class CheckFailed(Exception):
@@ -75,6 +77,16 @@ class KubeflowDashboardOperator(CharmBase):
         self._k8s_resource_handler = None
         self._configmap_handler = None
 
+        self.prometheus_provider = MetricsEndpointProvider(
+            charm=self,
+            relation_name="metrics-endpoint",
+            jobs=[
+                {
+                    "metrics_path": METRICS_PATH,
+                    "static_configs": [{"targets": ["*:{}".format(self._port)]}],
+                }
+            ],
+        )
         self.dashboard_provider = GrafanaDashboardProvider(self)
         port = ServicePort(int(self._port), name=f"{self.app.name}")
         self.service_patcher = KubernetesServicePatch(self, [port])
@@ -171,6 +183,7 @@ class KubeflowDashboardOperator(CharmBase):
                     "command": self._service,
                     "startup": "enabled",
                     "environment": {
+                        "COLLECT_METRICS": "true",
                         "USERID_HEADER": "kubeflow-userid",
                         "USERID_PREFIX": "",
                         "PROFILES_KFAM_SERVICE_HOST": f"{self.profiles_service}.{self.model.name}",
