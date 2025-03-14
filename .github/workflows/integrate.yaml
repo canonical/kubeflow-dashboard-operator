@@ -17,14 +17,19 @@ jobs:
 
   lint:
     name: Lint Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
       uses: actions/checkout@v4
 
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: 3.8
+
     - name: Install dependencies
-      run: sudo apt install tox
+      run: pip install tox
 
     - name: Lint code
       run: tox -e lint
@@ -37,24 +42,33 @@ jobs:
 
   unit:
     name: Unit Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
       uses: actions/checkout@v4
 
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: 3.8
+
     - name: Install dependencies
-      run: sudo apt install tox
+      run: pip install tox
 
     - name: Run unit tests
       run: tox -e unit
 
   deploy:
     name: Integration Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: 3.8
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -73,7 +87,7 @@ jobs:
       - name: Run test
         run: |
           juju add-model kubeflow
-          sg snap_microk8s -c "tox -e integration -- --model kubeflow"
+          tox -e integration -- --model kubeflow
 
       - name: Get juju status
         run: juju status
