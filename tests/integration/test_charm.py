@@ -93,7 +93,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
 async def test_add_profile_relation(ops_test: OpsTest):
-    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
+    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="1.10/stable", trust=True)
     await ops_test.model.integrate(PROFILES_CHARM_NAME, CHARM_NAME)
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
