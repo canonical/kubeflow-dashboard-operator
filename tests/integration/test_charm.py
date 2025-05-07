@@ -76,7 +76,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     await deploy_and_assert_grafana_agent(
         ops_test.model, CHARM_NAME, metrics=False, dashboard=False, logging=True
     )
-    
+
     # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
         [PROFILES_CHARM_NAME, CHARM_NAME],
