@@ -23,6 +23,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     DashboardLink,
 )
+from charms_dependencies import KUBEFLOW_PROFILES
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap, Service
@@ -34,7 +35,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
-PROFILES_CHARM_NAME = "kubeflow-profiles"
 
 DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
@@ -72,10 +72,12 @@ async def test_build_and_deploy(ops_test: OpsTest):
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
     await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
-    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="latest/edge", trust=True)
+    await ops_test.model.deploy(
+        KUBEFLOW_PROFILES.charm, channel=KUBEFLOW_PROFILES.channel, trust=KUBEFLOW_PROFILES.trust
+    )
 
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
-    await ops_test.model.relate(PROFILES_CHARM_NAME, CHARM_NAME)
+    await ops_test.model.relate(KUBEFLOW_PROFILES.charm, CHARM_NAME)
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
@@ -84,7 +86,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
-        [PROFILES_CHARM_NAME, CHARM_NAME],
+        [KUBEFLOW_PROFILES.charm, CHARM_NAME],
         status="active",
         raise_on_error=True,
         timeout=600,
@@ -156,7 +158,7 @@ async def test_configmap_contents_with_relations(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -188,7 +190,7 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -232,7 +234,7 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -273,7 +275,7 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
