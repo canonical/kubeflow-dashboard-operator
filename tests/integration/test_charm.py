@@ -107,7 +107,7 @@ async def test_status(ops_test: OpsTest):
         ("documentation", DEFAULT_DOCUMENTATION_TEXTS),
     ],
 )
-def test_configmap_contents_no_relations_or_config(
+async def test_configmap_contents_no_relations_or_config(
     lightkube_client: Client, location, default_link_texts
 ):
     """Tests the dashboard links before any relations or additional config.
