@@ -119,7 +119,7 @@ def test_configmap_contents_no_relations_or_config(
         DashboardLink(text=text, link="", location=location, icon="", type="", desc="")
         for text in default_link_texts
     ]
-    assert_links_in_configmap_by_text_value(
+    await assert_links_in_configmap_by_text_value(
         dummy_dashbaord_links, lightkube_client, location=location
     )
 
