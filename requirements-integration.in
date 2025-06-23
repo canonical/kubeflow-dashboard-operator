@@ -11,7 +11,7 @@ selenium
 selenium-wire
 # This is required due to the abstraction of cos integration
 # "charmed-kubeflow-chisme" pinned to avoid closed "latest" tracks with COS charms, see:
-# canonical/charmed-kubeflow-chisme#155
+# https://github.com/canonical/charmed-kubeflow-chisme/issues/155
 charmed-kubeflow-chisme>=0.4.11
 # This is needed only for this charm as the integration test files in
 # test/integration/ have imports from the charm code in src/charm.py
