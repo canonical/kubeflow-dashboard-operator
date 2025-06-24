@@ -6,6 +6,4 @@ platforms:
   ubuntu@24.04:amd64:
 
 parts:
-  charm:
-    plugin: dump
-    source: .
+  charm: {}
