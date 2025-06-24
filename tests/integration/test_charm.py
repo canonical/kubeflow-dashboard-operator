@@ -101,9 +101,9 @@ async def test_status(ops_test: OpsTest):
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
-        ("menu", [""]),
-        ("external", [""]),
-        ("quick", [""]),
+        ("menu", []),
+        ("external", []),
+        ("quick", []),
         ("documentation", DEFAULT_DOCUMENTATION_TEXTS),
     ],
 )
