@@ -7,8 +7,8 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DashboardLink,
     KubeflowDashboardLinksRequirer,
 )
+from ops import main
 from ops.charm import CharmBase
-from ops.main import main
 from ops.model import ActiveStatus
 
 # Map of location to the config field names for that location
