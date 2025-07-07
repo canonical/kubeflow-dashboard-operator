@@ -111,13 +111,13 @@ async def test_status(ops_test: OpsTest):
 @pytest.mark.parametrize(
     "location, default_link_texts",
     [
-        ("menu", [""]),
-        ("external", [""]),
-        ("quick", [""]),
+        ("menu", []),
+        ("external", []),
+        ("quick", []),
         ("documentation", DEFAULT_DOCUMENTATION_TEXTS),
     ],
 )
-def test_configmap_contents_no_relations_or_config(
+async def test_configmap_contents_no_relations_or_config(
     lightkube_client: Client, location, default_link_texts
 ):
     """Tests the dashboard links before any relations or additional config.
@@ -129,7 +129,7 @@ def test_configmap_contents_no_relations_or_config(
         DashboardLink(text=text, link="", location=location, icon="", type="", desc="")
         for text in default_link_texts
     ]
-    assert_links_in_configmap_by_text_value(
+    await assert_links_in_configmap_by_text_value(
         dummy_dashbaord_links, lightkube_client, location=location
     )
 
