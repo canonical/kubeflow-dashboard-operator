@@ -13,7 +13,7 @@ resources:
     description: 'Backing OCI image'
     auto-fetch: true
     # On using the ROCK, modify the service command in the charm.py to remove tini
-    upstream-source: docker.io/charmedkubeflow/centraldashboard:1.10.0-8dd1032
+    upstream-source: docker.io/charmedkubeflow/centraldashboard:1.10.0-50182f0
 provides:
   links:
     interface: kubeflow_dashboard_links
