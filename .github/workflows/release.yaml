@@ -10,6 +10,10 @@ on:
       origin-channel:
         description: 'Origin Channel'
         required: true
+      base-image-channel:
+        description: 'Base Image Channel. Defaults to 24.04'
+        default: '24.04'
+        required: false
 
 jobs:
   promote-charm:
@@ -24,3 +28,4 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           destination-channel: ${{ github.event.inputs.destination-channel }}
           origin-channel: ${{ github.event.inputs.origin-channel }}
+          base-channel: ${{ github.event.inputs.base-image-channel }}
