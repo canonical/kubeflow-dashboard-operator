@@ -4,7 +4,9 @@
 
 import json
 import logging
+from pathlib import Path
 
+import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -30,6 +32,7 @@ from dashboard_links import aggregate_links_as_json
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
 ]
+SERVICE_CONFIG_FILE = "src/service-config.yaml"
 CONFIGMAP_FILE = "src/templates/configmaps.yaml.j2"
 
 DASHBOARD_LINKS_RELATION_NAME = "links"
@@ -65,10 +68,13 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
-        # Uncomment the line below when using the rock and comment the next one
-        # and vice versa when using the upstream image
-        self._service = "npm start"
-        # self._service = "/sbin/tini -- npm start"
+        # If upstream Docker image is integrated replace the command to
+        # /sbin/tini -- npm start
+        # in the service-config.yaml
+        service_config_path = Path(SERVICE_CONFIG_FILE)
+        with open(service_config_path) as f:
+            config = yaml.safe_load(f) or {}
+        self._command = config.get("command")
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
@@ -180,7 +186,7 @@ class KubeflowDashboardOperator(CharmBase):
                 self._container_name: {
                     "override": "merge",
                     "summary": "entrypoint of the kubeflow_dashboard_operator image",
-                    "command": self._service,
+                    "command": self._command,
                     "startup": "enabled",
                     "environment": {
                         "COLLECT_METRICS": "true",
