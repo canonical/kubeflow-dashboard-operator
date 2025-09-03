@@ -73,8 +73,8 @@ class KubeflowDashboardOperator(CharmBase):
         # in the service-config.yaml
         service_config_path = Path(SERVICE_CONFIG_FILE)
         with open(service_config_path) as f:
-            config = yaml.safe_load(f) or {}
-        self._command = config.get("command")
+            service_config = yaml.safe_load(f)
+        self._command = service_config.get("command")
         self._container_name = "kubeflow-dashboard"
         self._container = self.unit.get_container(self._name)
         self._configmap_name = self.model.config["dashboard-configmap"]
