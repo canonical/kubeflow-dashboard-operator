@@ -15,7 +15,7 @@ resources:
     # If upstream Docker image is integrated replace the command to
     # /sbin/tini -- npm start
     # in the service-config.yaml
-    upstream-source: docker.io/charmedkubeflow/centraldashboard:1.10.0-e346d61
+    upstream-source: docker.io/charmedkubeflow/centraldashboard:1.10.0-c0e356a
 provides:
   links:
     interface: kubeflow_dashboard_links
