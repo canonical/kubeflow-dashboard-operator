@@ -91,9 +91,7 @@ jobs:
         if: failure()
 
       - uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
-        # always() if you want this to run on every run, regardless of failure.
-        # more details: https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions
-        if: always()
+        if: failure()
 
       - name: Upload selenium screenshots
         uses: actions/upload-artifact@v4
