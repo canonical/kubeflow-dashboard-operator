@@ -1,6 +1,7 @@
 resource "juju_application" "kubeflow_dashboard" {
   charm {
     name     = "kubeflow-dashboard"
+    base     = var.base
     channel  = var.channel
     revision = var.revision
   }
