@@ -16,8 +16,11 @@ from charmed_kubeflow_chisme.testing import (
     assert_grafana_dashboards,
     assert_logging,
     assert_metrics_endpoint,
+    assert_security_context,
     deploy_and_assert_grafana_agent,
+    generate_container_securitycontext_map,
     get_grafana_dashboards,
+    get_pod_names,
 )
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
@@ -33,6 +36,7 @@ from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
 
@@ -351,7 +355,7 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     assert "<title>Kubeflow Central Dashboard</title>" in result_text
 
 
-async def test_metrics_enpoint(ops_test):
+async def test_metrics_endpoint(ops_test):
     """Test metrics_endpoints are defined in relation data bag and their accessibility.
     This function gets all the metrics_endpoints from the relation data bag, checks if
     they are available from the grafana-agent-k8s charm and finally compares them with the
@@ -374,3 +378,25 @@ async def test_grafana_dashboards(ops_test: OpsTest):
     dashboards = get_grafana_dashboards()
     log.info("found dashboards: %s", dashboards)
     await assert_grafana_dashboards(app, dashboards)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+async def test_container_security_context(
+    ops_test: OpsTest,
+    lightkube_client: Client,
+    container_name: str,
+):
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    pod_name = get_pod_names(ops_test.model.name, CHARM_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        ops_test.model.name,
+    )
