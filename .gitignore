@@ -1,4 +1,5 @@
 .coverage
+coverage.xml
 build/
 .tox/
 __pycache__
@@ -6,7 +7,7 @@ __pycache__
 geckodriver.log
 .idea
 venv
-# vscode 
+# vscode
 .vscode
 .terraform*
 *.tfstate*
