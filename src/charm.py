@@ -109,14 +109,15 @@ class KubeflowDashboardOperator(CharmBase):
         self.service_patcher = KubernetesServicePatch(self, [port])
 
         # Ambient Mesh integration
-        self._mesh = ServiceMeshConsumer(
-            self,
-            policies=[
-                UnitPolicy(relation="metrics-endpoint", ports=[self._port]),
-            ],
-        )
-        self.ingress = IstioIngressRouteRequirer(self, relation_name="istio-ingress-route")
-        self._ambient_mesh_ingress()
+        if self.unit.is_leader():
+            self._mesh = ServiceMeshConsumer(
+                self,
+                policies=[
+                    UnitPolicy(relation="metrics-endpoint", ports=[self._port]),
+                ],
+            )
+            self.ingress = IstioIngressRouteRequirer(self, relation_name="istio-ingress-route")
+            self._ambient_mesh_ingress()
 
         for event in [
             self.on.install,
