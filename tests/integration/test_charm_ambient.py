@@ -83,7 +83,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
-    await ops_test.model.relate(KUBEFLOW_PROFILES.charm, CHARM_NAME)
+    await ops_test.model.integrate(
+        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles", f"{CHARM_NAME}:kubeflow-profiles"
+    )
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
