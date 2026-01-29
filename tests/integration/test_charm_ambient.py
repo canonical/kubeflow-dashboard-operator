@@ -84,7 +84,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
-    await ops_test.model.relate(
+    await ops_test.model.integrate(
         f"{KUBEFLOW_PROFILES.charm}:{KUBEFLOW_PROFILES_RELATION_NAME}",
         f"{CHARM_NAME}:{KUBEFLOW_PROFILES_RELATION_NAME}",
     )
