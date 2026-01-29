@@ -231,15 +231,6 @@ class KubeflowDashboardOperator(CharmBase):
         if not self.container.can_connect():
             raise CheckFailed("Pod startup is not complete", MaintenanceStatus)
 
-    def _check_model_name(self):
-        if self.model.name != "kubeflow":
-            # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
-            raise CheckFailed(
-                "kubeflow-dashboard must be deployed to model named `kubeflow`:"
-                " https://git.io/J6d35",
-                BlockedStatus,
-            )
-
     def _check_leader(self):
         if not self.unit.is_leader():
             raise CheckFailed("Waiting for leadership", WaitingStatus)
@@ -354,7 +345,6 @@ class KubeflowDashboardOperator(CharmBase):
         """Main entry point for the Charm."""
         try:
             self._check_container_connection()
-            self._check_model_name()
             self._check_leader()
             self._check_istio_relations()
             interfaces = self._get_interfaces()

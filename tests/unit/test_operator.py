@@ -78,11 +78,10 @@ class _FakeChangeError(ChangeError):
         super().__init__(err, change)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def harness() -> Harness:
     harness = Harness(KubeflowDashboardOperator)
-    # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
-    harness.set_model_name("kubeflow")
+    harness.set_model_name("a-model")
     yield harness
     harness.cleanup()
 
@@ -122,28 +121,6 @@ class TestCharm:
         harness.begin_with_initial_hooks()
         harness.set_leader(True)
         assert harness.charm.model.unit.status != WaitingStatus("Waiting for leadership")
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_check_model_name_failure(self):
-        # Tests that unit will BlockStatus if deployed outside a model named kubeflow
-        # Remove when this bug is resolved: https://github.com/kubeflow/kubeflow/issues/6136
-        harness = Harness(KubeflowDashboardOperator)
-        harness.set_model_name("notkubeflow")
-        harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status == BlockedStatus(
-            "kubeflow-dashboard must be deployed to model named `kubeflow`:"
-            " https://git.io/J6d35"
-        )
-
-    @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    def test_check_model_name_success(self, harness: Harness):
-        harness.set_model_name("kubeflow")
-        harness.set_leader(True)
-        harness.begin_with_initial_hooks()
-        assert harness.charm.model.unit.status != BlockedStatus(
-            "kubeflow-dashboard must be deployed to model named `kubeflow`:"
-            " https://git.io/J6d35"
-        )
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_kf_profiles_failure(self, harness: Harness):

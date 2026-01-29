@@ -70,8 +70,7 @@ jobs:
 
       - name: Run test
         run: |
-          juju add-model kubeflow
-          tox -e ${{ matrix.test-type }} -- --model kubeflow
+          tox -e ${{ matrix.test-type }} -- --model testing
 
       - name: Get juju status
         run: juju status
