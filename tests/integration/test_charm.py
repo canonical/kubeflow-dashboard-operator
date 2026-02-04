@@ -16,13 +16,17 @@ from charmed_kubeflow_chisme.testing import (
     assert_grafana_dashboards,
     assert_logging,
     assert_metrics_endpoint,
+    assert_security_context,
     deploy_and_assert_grafana_agent,
+    generate_container_securitycontext_map,
     get_grafana_dashboards,
+    get_pod_names,
 )
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
     DashboardLink,
 )
+from charms_dependencies import KUBEFLOW_PROFILES
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap, Service
@@ -32,9 +36,9 @@ from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
-PROFILES_CHARM_NAME = "kubeflow-profiles"
 
 DASHBOARD_LINKS_REQUIRER_TESTER_CHARM = Path(
     "tests/integration/dashboard_links_requirer_tester_charm"
@@ -72,31 +76,21 @@ async def test_build_and_deploy(ops_test: OpsTest):
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
     await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
+    await ops_test.model.deploy(
+        KUBEFLOW_PROFILES.charm, channel=KUBEFLOW_PROFILES.channel, trust=KUBEFLOW_PROFILES.trust
+    )
 
-    await ops_test.model.wait_for_idle(
-        [CHARM_NAME],
-        raise_on_error=True,
-        timeout=300,
-    )
-    assert ops_test.model.applications[CHARM_NAME].units[0].workload_status == "blocked"
-    assert (
-        ops_test.model.applications[CHARM_NAME].units[0].workload_status_message
-        == "Add required relation to kubeflow-profiles"
-    )
+    # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
+    await ops_test.model.relate(KUBEFLOW_PROFILES.charm, CHARM_NAME)
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
         ops_test.model, CHARM_NAME, metrics=True, dashboard=True, logging=True
     )
 
-
-@pytest.mark.asyncio
-@pytest.mark.abort_on_fail
-async def test_add_profile_relation(ops_test: OpsTest):
-    await ops_test.model.deploy(PROFILES_CHARM_NAME, channel="1.10/stable", trust=True)
-    await ops_test.model.integrate(PROFILES_CHARM_NAME, CHARM_NAME)
+    # Wait for everything to be active and idle
     await ops_test.model.wait_for_idle(
-        [PROFILES_CHARM_NAME, CHARM_NAME],
+        [KUBEFLOW_PROFILES.charm, CHARM_NAME],
         status="active",
         raise_on_error=True,
         timeout=600,
@@ -168,7 +162,7 @@ async def test_configmap_contents_with_relations(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -200,7 +194,7 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -244,7 +238,7 @@ async def test_configmap_contents_with_menu_links_from_config(
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -285,7 +279,7 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
 
     # Wait for everything to settle
     await ops_test.model.wait_for_idle(
-        apps=[CHARM_NAME, PROFILES_CHARM_NAME, *TESTER_CHARMS],
+        apps=[CHARM_NAME, KUBEFLOW_PROFILES.charm, *TESTER_CHARMS],
         raise_on_error=True,
         raise_on_blocked=False,  # grafana-agent-k8s is expected to be blocked
         status="active",
@@ -361,7 +355,7 @@ async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
     assert "<title>Kubeflow Central Dashboard</title>" in result_text
 
 
-async def test_metrics_enpoint(ops_test):
+async def test_metrics_endpoint(ops_test):
     """Test metrics_endpoints are defined in relation data bag and their accessibility.
     This function gets all the metrics_endpoints from the relation data bag, checks if
     they are available from the grafana-agent-k8s charm and finally compares them with the
@@ -384,3 +378,25 @@ async def test_grafana_dashboards(ops_test: OpsTest):
     dashboards = get_grafana_dashboards()
     log.info("found dashboards: %s", dashboards)
     await assert_grafana_dashboards(app, dashboards)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+async def test_container_security_context(
+    ops_test: OpsTest,
+    lightkube_client: Client,
+    container_name: str,
+):
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    pod_name = get_pod_names(ops_test.model.name, CHARM_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        ops_test.model.name,
+    )
