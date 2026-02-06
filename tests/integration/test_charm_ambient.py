@@ -51,6 +51,7 @@ HEADERS = {
     "kubeflow-userid": "test",
 }
 HTTP_PATH = "/volumes/"
+KUBEFLOW_PROFILES_RELATION_NAME = "kubeflow-profiles"
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +84,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
-    await ops_test.model.relate(KUBEFLOW_PROFILES.charm, CHARM_NAME)
+    await ops_test.model.relate(
+        f"{KUBEFLOW_PROFILES.charm}:{KUBEFLOW_PROFILES_RELATION_NAME}",
+        f"{CHARM_NAME}:{KUBEFLOW_PROFILES_RELATION_NAME}",
+    )
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
