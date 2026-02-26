@@ -220,7 +220,7 @@ class KubeflowDashboardOperator(CharmBase):
                         ).lower(),  # convert to a string because the applied layer will have it  # noqa E501
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
-                        "POD_NAMESPACE": self.model.name,  # Added due to https://github.com/canonical/bundle-kubeflow/issues/698  # noqa E501
+                        "POD_NAMESPACE": self.model.name,
                     },
                 }
             },
