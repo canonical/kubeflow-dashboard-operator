@@ -108,7 +108,7 @@
         {
           "datasource": "${prometheusds}",
           "editorMode": "code",
-          "expr": "up{juju_model=~\"kubeflow\"}",
+          "expr": "up{juju_model=~\"{{juju_model}}\"}",
           "instant": false,
           "legendFormat": "{{juju_application}}",
           "range": true,
