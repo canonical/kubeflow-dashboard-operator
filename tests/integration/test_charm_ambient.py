@@ -50,7 +50,7 @@ DEFAULT_DOCUMENTATION_TEXTS = [
 HEADERS = {
     "kubeflow-userid": "test",
 }
-HTTP_PATH = "/volumes/"
+HTTP_PATH = "/some-path-that-does-not-exist/"
 KUBEFLOW_PROFILES_RELATION_NAME = "kubeflow-profiles"
 
 log = logging.getLogger(__name__)
