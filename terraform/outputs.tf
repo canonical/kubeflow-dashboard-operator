@@ -15,6 +15,8 @@ output "requires" {
   value = {
     ingress             = "ingress",
     istio_ingress_route = "istio-ingress-route",
+    login_request_auth  = "login-request-auth",
+    m2m_request_auth    = "m2m-request-auth",
     kubeflow_profiles   = "kubeflow-profiles",
     logging             = "logging",
     require_cmr_mesh    = "require-cmr-mesh",
