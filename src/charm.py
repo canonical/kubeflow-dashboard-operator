@@ -284,7 +284,10 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _ambient_mesh_ingress(self):
         # ambient mesh
-        http_listener = Listener(port=80, protocol=ProtocolType.HTTP)
+        if self.ingress.tls_enabled:
+            http_listener = Listener(port=443, protocol=ProtocolType.HTTP)
+        else:
+            http_listener = Listener(port=80, protocol=ProtocolType.HTTP)
 
         config = IstioIngressRouteConfig(
             model=self.model.name,

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
+from charms.istio_ingress_k8s.v0.istio_ingress_route import ProtocolType
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINKS_FIELD,
     DashboardLink,
@@ -400,6 +401,54 @@ class TestSidebarLinks:
             harness.charm.model.unit.status,
             BlockedStatus,
         )
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.IstioIngressRouteRequirer")
+    @patch("charm.ServiceMeshConsumer")
+    def test_ambient_mesh_ingress_without_tls(
+        self,
+        mock_mesh_consumer: MagicMock,
+        mock_ingress_cls: MagicMock,
+        harness: Harness,
+    ):
+        """Test that _ambient_mesh_ingress uses port 80/HTTP when TLS is disabled."""
+        mock_ingress = MagicMock()
+        mock_ingress.tls_enabled = False
+        mock_ingress_cls.return_value = mock_ingress
+
+        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.set_leader(True)
+        harness.begin()
+
+        mock_ingress.submit_config.assert_called_once()
+        config = mock_ingress.submit_config.call_args[0][0]
+        assert len(config.listeners) == 1
+        assert config.listeners[0].port == 80
+        assert config.listeners[0].protocol == ProtocolType.HTTP
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.IstioIngressRouteRequirer")
+    @patch("charm.ServiceMeshConsumer")
+    def test_ambient_mesh_ingress_with_tls(
+        self,
+        mock_mesh_consumer: MagicMock,
+        mock_ingress_cls: MagicMock,
+        harness: Harness,
+    ):
+        """Test that _ambient_mesh_ingress uses port 443 when TLS is enabled."""
+        mock_ingress = MagicMock()
+        mock_ingress.tls_enabled = True
+        mock_ingress_cls.return_value = mock_ingress
+
+        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.set_leader(True)
+        harness.begin()
+
+        mock_ingress.submit_config.assert_called_once()
+        config = mock_ingress.submit_config.call_args[0][0]
+        assert len(config.listeners) == 1
+        assert config.listeners[0].port == 443
+        assert config.listeners[0].protocol == ProtocolType.HTTP
 
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
