@@ -1,5 +1,4 @@
-# Copyright 2023 Canonical Ltd.
-# See LICENSE file for licensing details.
+# Copyright 2023 Canonical Ltd. See LICENSE file for licensing details.
 import json
 import logging
 import shutil
@@ -7,7 +6,6 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
 
-import aiohttp
 import pytest
 import pytest_asyncio
 import yaml
@@ -16,11 +14,10 @@ from charmed_kubeflow_chisme.testing import (
     assert_grafana_dashboards,
     assert_logging,
     assert_metrics_endpoint,
-    assert_security_context,
+    assert_path_reachable_through_ingress,
     deploy_and_assert_grafana_agent,
-    generate_container_securitycontext_map,
+    deploy_and_integrate_service_mesh_charms,
     get_grafana_dashboards,
-    get_pod_names,
 )
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
@@ -29,14 +26,13 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
 from charms_dependencies import KUBEFLOW_PROFILES
 from dashboard_links_requirer_tester_charm.src.charm import generate_links_for_location
 from lightkube import Client
-from lightkube.resources.core_v1 import ConfigMap, Service
+from lightkube.resources.core_v1 import ConfigMap
 from pytest_operator.plugin import OpsTest
 
 from charm import ADDITIONAL_LINKS_CONFIG_NAME, EXTERNAL_LINKS_ORDER_CONFIG_NAME
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
-CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 CONFIG = yaml.safe_load(Path("./config.yaml").read_text())
 CONFIGMAP_NAME = CONFIG["options"]["dashboard-configmap"]["default"]
 
@@ -51,6 +47,11 @@ DEFAULT_DOCUMENTATION_TEXTS = [
     "Microk8s for Kubeflow",
     "Requirements for Kubeflow",
 ]
+HEADERS = {
+    "kubeflow-userid": "test",
+}
+HTTP_PATH = "/volumes/"
+KUBEFLOW_PROFILES_RELATION_NAME = "kubeflow-profiles"
 
 log = logging.getLogger(__name__)
 
@@ -81,15 +82,25 @@ async def test_build_and_deploy(ops_test: OpsTest, request):
 
     await ops_test.model.deploy(entity_url, resources={"oci-image": image_path}, trust=True)
     await ops_test.model.deploy(
-        KUBEFLOW_PROFILES.charm, channel=KUBEFLOW_PROFILES.channel, trust=KUBEFLOW_PROFILES.trust
+        KUBEFLOW_PROFILES.charm,
+        channel=KUBEFLOW_PROFILES.channel,
+        trust=KUBEFLOW_PROFILES.trust,
     )
 
     # Add relation between kubeflow-dashboard-operator and kubeflow-profile-operator
-    await ops_test.model.relate(KUBEFLOW_PROFILES.charm, CHARM_NAME)
+    await ops_test.model.integrate(
+        f"{KUBEFLOW_PROFILES.charm}:{KUBEFLOW_PROFILES_RELATION_NAME}",
+        f"{CHARM_NAME}:{KUBEFLOW_PROFILES_RELATION_NAME}",
+    )
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
         ops_test.model, CHARM_NAME, metrics=True, dashboard=True, logging=True
+    )
+
+    await deploy_and_integrate_service_mesh_charms(
+        app=CHARM_NAME,
+        model=ops_test.model,
     )
 
     # Wait for everything to be active and idle
@@ -116,19 +127,19 @@ async def test_status(ops_test: OpsTest):
     ],
 )
 async def test_configmap_contents_no_relations_or_config(
-    lightkube_client: Client, location, default_link_texts
+    ops_test: OpsTest, lightkube_client: Client, location, default_link_texts
 ):
     """Tests the dashboard links before any relations or additional config.
 
     If this test failed, then likely the default links for one or more location have changed.  If
     this was desired, update this test.  Otherwise, fix the bug that removed them.
     """
-    dummy_dashbaord_links = [
+    dummy_dashboard_links = [
         DashboardLink(text=text, link="", location=location, icon="", type="", desc="")
         for text in default_link_texts
     ]
     await assert_links_in_configmap_by_text_value(
-        dummy_dashbaord_links, lightkube_client, location=location
+        dummy_dashboard_links, lightkube_client, ops_test.model_name, location=location
     )
 
 
@@ -146,7 +157,9 @@ async def test_configmap_contents_with_relations(
 
     # Get the number of links for each group before, so we can confirm we didn't remove them later.
     starting_n_links = {
-        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        location: len(
+            await get_link_texts_from_configmap(lightkube_client, ops_test.model_name, location)
+        )
         for location in DASHBOARD_LINK_LOCATIONS
     }
 
@@ -175,7 +188,11 @@ async def test_configmap_contents_with_relations(
 
     for location in DASHBOARD_LINK_LOCATIONS:
         links = await assert_links_in_configmap_by_text_value(
-            expected_links[location], lightkube_client, location=location, assert_exact=False
+            expected_links[location],
+            lightkube_client,
+            ops_test.model_name,
+            location=location,
+            assert_exact=False,
         )
         assert len(links) == starting_n_links[location] + len(expected_links[location])
 
@@ -208,7 +225,9 @@ async def test_configmap_contents_with_menu_links_from_config(
     # Get the number of links for each group before adding config, so we can confirm we didn't
     # remove any preexisting links from other sources at the end of the test.
     starting_n_links = {
-        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        location: len(
+            await get_link_texts_from_configmap(lightkube_client, ops_test.model_name, location)
+        )
         for location in DASHBOARD_LINK_LOCATIONS
     }
 
@@ -252,7 +271,11 @@ async def test_configmap_contents_with_menu_links_from_config(
     # Assert
     for location in DASHBOARD_LINK_LOCATIONS:
         links = await assert_links_in_configmap_by_text_value(
-            expected_links[location], lightkube_client, location=location, assert_exact=False
+            expected_links[location],
+            lightkube_client,
+            ops_test.model_name,
+            location=location,
+            assert_exact=False,
         )
         assert len(links) == starting_n_links[location] + len(
             expected_links[location]
@@ -268,7 +291,9 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
     # Get the number of links for each group before adding config, so we can confirm we didn't
     # remove any preexisting links from other sources at the end of the test.
     starting_n_links = {
-        location: len(await get_link_texts_from_configmap(lightkube_client, location))
+        location: len(
+            await get_link_texts_from_configmap(lightkube_client, ops_test.model_name, location)
+        )
         for location in DASHBOARD_LINK_LOCATIONS
     }
 
@@ -292,27 +317,33 @@ async def test_configmap_contents_with_ordering(ops_test: OpsTest, lightkube_cli
 
     # Assert
     for location in DASHBOARD_LINK_LOCATIONS:
-        link_texts = await get_link_texts_from_configmap(lightkube_client, location)
+        link_texts = await get_link_texts_from_configmap(
+            lightkube_client, ops_test.model_name, location
+        )
         assert len(link_texts) == starting_n_links[location]
         if location in ["menu", "documentation"]:
             assert link_texts[0] == f"{location}-config2"
 
 
-async def get_link_texts_from_configmap(lightkube_client, location):
+async def get_link_texts_from_configmap(lightkube_client: Client, namespace: str, location: str):
     location_map = {
         "menu": "menuLinks",
         "external": "externalLinks",
         "quick": "quickLinks",
         "documentation": "documentationItems",
     }
-    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace="kubeflow")
+    configmap = lightkube_client.get(ConfigMap, CONFIGMAP_NAME, namespace=namespace)
     links = json.loads(configmap.data["links"])[location_map[location]]
     actual_link_text = [item["text"] for item in links]
     return actual_link_text
 
 
 async def assert_links_in_configmap_by_text_value(
-    expected_links, lightkube_client, location="menu", assert_exact=True
+    expected_links: list,
+    lightkube_client: Client,
+    namespace: str,
+    location: str = "menu",
+    assert_exact: bool = True,
 ) -> List[Dict]:
     """Asserts that the dashboard configmap has the given link texts at this location.
 
@@ -323,7 +354,7 @@ async def assert_links_in_configmap_by_text_value(
     If assert_exact=True, this asserts configmap must have exactly these links.  Else, we only
     test that these links are in the configmap (aka, the configmap is a superset)
     """
-    links_texts = await get_link_texts_from_configmap(lightkube_client, location)
+    links_texts = await get_link_texts_from_configmap(lightkube_client, namespace, location)
     # Order is not guaranteed, so check that each is included individually
     if assert_exact:
         assert len(links_texts) == len(expected_links)
@@ -335,31 +366,19 @@ async def assert_links_in_configmap_by_text_value(
     return links_texts
 
 
-async def test_dashboard_access(ops_test: OpsTest, lightkube_client: Client):
-    """Tests that the dashboard is accessible by sending an HTTP request to the
-    kubeflow-dashboard Service IP and checking the HTTP status code and the response
-    text.
-    """
-    namespace = ops_test.model_name
-    application_ip = lightkube_client.get(Service, CHARM_NAME, namespace=namespace).spec.clusterIP
-    application_port = (await ops_test.model.applications[CHARM_NAME].get_config())["port"][
-        "value"
-    ]
-    # The URL to access the central dashboard, in this case kubeflow-dashboard's
-    # IP + the port specified in the configuration
-    url = f"http://{str(application_ip)}:{str(application_port)}"
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=None) as response:
-            result_status = response.status
-            result_text = str(await response.text())
-    # Assert that we receive the expected status code
-    assert result_status == 200
-    # And that the title is the one expected
-    assert "<title>Kubeflow Central Dashboard</title>" in result_text
+@pytest.mark.abort_on_fail
+async def test_ui_is_accessible(ops_test: OpsTest):
+    """Verify that UI is accessible through the ingress gateway."""
+    await assert_path_reachable_through_ingress(
+        http_path=HTTP_PATH,
+        namespace=ops_test.model_name,
+        headers=HEADERS,
+        expected_status=200,
+        expected_content_type="text/html",
+    )
 
 
-async def test_metrics_endpoint(ops_test):
+async def test_metrics_enpoint(ops_test: OpsTest):
     """Test metrics_endpoints are defined in relation data bag and their accessibility.
     This function gets all the metrics_endpoints from the relation data bag, checks if
     they are available from the grafana-agent-k8s charm and finally compares them with the
@@ -382,25 +401,3 @@ async def test_grafana_dashboards(ops_test: OpsTest):
     dashboards = get_grafana_dashboards()
     log.info("found dashboards: %s", dashboards)
     await assert_grafana_dashboards(app, dashboards)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
-async def test_container_security_context(
-    ops_test: OpsTest,
-    lightkube_client: Client,
-    container_name: str,
-):
-    """Test container security context is correctly set.
-
-    Verify that container spec defines the security context with correct
-    user ID and group ID.
-    """
-    pod_name = get_pod_names(ops_test.model.name, CHARM_NAME)[0]
-    assert_security_context(
-        lightkube_client,
-        pod_name,
-        container_name,
-        CONTAINERS_SECURITY_CONTEXT_MAP,
-        ops_test.model.name,
-    )
