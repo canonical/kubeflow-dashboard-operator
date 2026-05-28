@@ -72,11 +72,15 @@ async def lightkube_client():
 
 @pytest.mark.asyncio
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    my_charm = await ops_test.build_charm(".")
+async def test_build_and_deploy(ops_test: OpsTest, request):
+    entity_url = (
+        await ops_test.build_charm(".")
+        if not (entity_url := request.config.getoption("--charm-path"))
+        else entity_url
+    )
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
 
-    await ops_test.model.deploy(my_charm, resources={"oci-image": image_path}, trust=True)
+    await ops_test.model.deploy(entity_url, resources={"oci-image": image_path}, trust=True)
     await ops_test.model.deploy(
         KUBEFLOW_PROFILES.charm, channel=KUBEFLOW_PROFILES.channel, trust=KUBEFLOW_PROFILES.trust
     )
