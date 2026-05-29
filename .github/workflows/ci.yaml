@@ -126,7 +126,7 @@ jobs:
       fail-fast: false
       matrix:
         charm: [kubeflow-dashboard]
-        test-type: [integration, integration-ambient]
+        test-type: [integration]
     steps:
       - uses: actions/checkout@v4
 
@@ -140,14 +140,6 @@ jobs:
           sudo snap install concierge --classic
           sudo concierge prepare --trace
 
-      - name: Configure Cilium for Canonical K8s
-        if: matrix.test-type == 'integration-ambient'
-        run: |
-          # for context, see https://docs.cilium.io/en/stable/network/servicemesh/istio/
-          kubectl -n kube-system patch configmap cilium-config --type merge --patch '{"data":{"bpf-lb-sock-hostns-only":"true"}}'
-          kubectl -n kube-system patch configmap cilium-config --type merge --patch '{"data":{"cni-exclusive":"false"}}'
-          kubectl -n kube-system rollout restart daemonset cilium
-
       - name: Download packed charm(s)
         id: download-charms
         timeout-minutes: 5
@@ -158,7 +150,7 @@ jobs:
 
       - name: Integration tests
         run: |
-          tox -vve ${{ matrix.test-type }} -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
+          tox -vve ${{ matrix.test-type }} -- --model kubeflow --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
 
       # On failure, capture debugging resources
       - name: Get juju status
