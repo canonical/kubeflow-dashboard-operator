@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
+from charms.istio_ingress_k8s.v0.istio_ingress_route import ProtocolType
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINKS_FIELD,
     DashboardLink,
@@ -400,6 +401,33 @@ class TestSidebarLinks:
             harness.charm.model.unit.status,
             BlockedStatus,
         )
+
+    @pytest.mark.parametrize("tls_enabled, expected_port", [(False, 80), (True, 443)])
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.IstioIngressRouteRequirer")
+    @patch("charm.ServiceMeshConsumer")
+    def test_ambient_mesh_ingress(
+        self,
+        mock_mesh_consumer: MagicMock,
+        mock_ingress_cls: MagicMock,
+        harness: Harness,
+        tls_enabled: bool,
+        expected_port: int,
+    ):
+        """Test that _ambient_mesh_ingress uses the correct port based on TLS setting."""
+        mock_ingress = MagicMock()
+        mock_ingress.tls_enabled = tls_enabled
+        mock_ingress_cls.return_value = mock_ingress
+
+        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.set_leader(True)
+        harness.begin()
+
+        mock_ingress.submit_config.assert_called_once()
+        config = mock_ingress.submit_config.call_args[0][0]
+        assert len(config.listeners) == 1
+        assert config.listeners[0].port == expected_port
+        assert config.listeners[0].protocol == ProtocolType.HTTP
 
 
 def add_sidebar_relation(harness: Harness, other_app_name: str):
