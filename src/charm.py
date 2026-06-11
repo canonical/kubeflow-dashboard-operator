@@ -10,6 +10,12 @@ import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charmlibs.interfaces.istio_request_auth import (
+    ClaimToHeader,
+    FromHeader,
+    IstioRequestAuthRequirer,
+    JWTRule,
+)
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_beacon_k8s.v0.service_mesh import ServiceMeshConsumer, UnitPolicy
 from charms.istio_ingress_k8s.v0.istio_ingress_route import (
@@ -119,6 +125,9 @@ class KubeflowDashboardOperator(CharmBase):
             self.ingress = IstioIngressRouteRequirer(self, relation_name="istio-ingress-route")
             self._ambient_mesh_ingress()
 
+            self.login_request_auth = IstioRequestAuthRequirer(self, relation_name="login-request-auth")
+            self.m2m_request_auth = IstioRequestAuthRequirer(self, relation_name="m2m-request-auth")
+
         for event in [
             self.on.install,
             self.on.leader_elected,
@@ -126,6 +135,8 @@ class KubeflowDashboardOperator(CharmBase):
             self.on.config_changed,
             self.on["kubeflow-profiles"].relation_changed,
             self.on["ingress"].relation_changed,
+            self.on["login-request-auth"].relation_changed,
+            self.on["m2m-request-auth"].relation_changed,
             self.on.kubeflow_dashboard_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
@@ -221,6 +232,8 @@ class KubeflowDashboardOperator(CharmBase):
                         "DASHBOARD_CONFIGMAP": self._configmap_name,
                         "LOGOUT_URL": "/authservice/logout",
                         "POD_NAMESPACE": self.model.name,
+                        "DEBUG": "*",
+                        "LOG_LEVEL": "debug",
                     },
                 }
             },
@@ -294,10 +307,10 @@ class KubeflowDashboardOperator(CharmBase):
 
     def _check_istio_relations(self):
         """Check that both ambient and sidecar relations are not present simultaneously."""
-        ambient_relation = self.model.get_relation("istio-ingress-route")
+        ambient_relations = self.model.relations["istio-ingress-route"]
         sidecar_relation = self.model.get_relation("ingress")
 
-        if ambient_relation and sidecar_relation:
+        if ambient_relations and sidecar_relation:
             self.logger.error(
                 "Both 'istio-ingress-route' and 'ingress' relations are present, "
                 "remove one to unblock."
@@ -307,6 +320,24 @@ class KubeflowDashboardOperator(CharmBase):
                 "at the same time.",
                 BlockedStatus,
             )
+        
+    def _update_login_jwt_rule(self):
+        login_jwt_rule = JWTRule(
+            issuer=self.model.config["jwt-issuer"],
+            forward_original_token=True,
+            claim_to_headers=[ClaimToHeader(header="kubeflow-userid", claim="email")],
+            from_headers=[FromHeader(name="Authorization", prefix="Bearer ")],
+        )
+        self.login_request_auth.publish_data([login_jwt_rule])
+
+    def _update_m2m_jwt_rule(self):
+        m2m_jwt_rule = JWTRule(
+            issuer=self.model.config["jwt-issuer"],
+            forward_original_token=True,
+            claim_to_headers=[ClaimToHeader(header="kubeflow-userid", claim="sub")],
+            from_headers=[FromHeader(name="Authorization", prefix="Bearer ")],
+        )
+        self.m2m_request_auth.publish_data([m2m_jwt_rule])
 
     def _check_kf_profiles(self, interfaces):
         kf_profiles = interfaces["kubeflow-profiles"]
@@ -357,6 +388,8 @@ class KubeflowDashboardOperator(CharmBase):
             kf_profiles = self._get_data_from_profiles_interface(kf_profiles_interface)
             self.profiles_service = kf_profiles["service-name"]
             self._update_layer()
+            self._update_login_jwt_rule()
+            self._update_m2m_jwt_rule()
         except CheckFailed as e:
             self.model.unit.status = e.status
             return

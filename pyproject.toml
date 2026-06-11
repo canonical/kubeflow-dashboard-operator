@@ -58,6 +58,8 @@ serialized-data-interface = "^0.7.0"
 charmed-service-mesh-helpers = ">=0.2.0"
 pydantic = ">=2"
 lightkube-extensions = ">=0.2.0"
+charmlibs-interfaces-istio-request-auth = "*"
+canonical-service-mesh = "*"
 
 [tool.poetry.group.fmt]
 optional = true

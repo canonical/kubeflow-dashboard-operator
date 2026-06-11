@@ -101,4 +101,10 @@ requires:
     interface: cross_model_mesh
     description: |
       If this app relates to other applications on a charmed service mesh cross-model, use this relation to send that related app additional data needed to automatically generate traffic authorization policies.  This is required because Juju does not natively provide all information required to build these policies when related cross-model.
+  login-request-auth:
+    interface: istio_request_auth
+    limit: 1
+  m2m-request-auth:
+    interface: istio_request_auth
+    limit: 1
 charm-user: non-root

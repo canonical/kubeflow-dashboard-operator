@@ -62,3 +62,7 @@ options:
     description: >
       YAML or JSON formatted list of strings defining the order of the documentation links in the dashboard sidebar.  
       For usage details, see https://github.com/canonical/kubeflow-dashboard-operator.
+  jwt-issuer:
+    type: string
+    default: ''
+    description: The expected issuer of the JWT token. 
