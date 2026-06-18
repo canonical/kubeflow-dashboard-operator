@@ -402,6 +402,26 @@ class TestSidebarLinks:
             BlockedStatus,
         )
 
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    def test_multiple_ambient_relations_added(
+        self, k8s_resource_handler: MagicMock, harness: Harness
+    ):
+        """Test that multiple istio-ingress-route relations are handled without erroring."""
+        # Arrange
+        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.add_relation("istio-ingress-route", "istio-ingress-k8s-2")
+
+        # Act
+        harness.begin()
+
+        # Inspecting the full list of relations per endpoint must not raise even
+        # though there is more than one relation on a single endpoint.
+        harness.charm._check_istio_relations()
+
+        # Assert
+        assert not isinstance(harness.charm.model.unit.status, BlockedStatus)
+
     @pytest.mark.parametrize("tls_enabled, expected_port", [(False, 80), (True, 443)])
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     @patch("charm.IstioIngressRouteRequirer")
