@@ -9,7 +9,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import GenericCharmRuntimeError
-from charms.istio_ingress_k8s.v0.istio_ingress_route import ProtocolType
+from charmed_kubeflow_chisme.testing import ISTIO_INGRESS_K8S_APP, ISTIO_INGRESS_ROUTE_ENDPOINT
+from charms.istio_ingress_k8s.v0.istio_ingress_route import (
+    HTTPPathMatchType,
+    IstioIngressRouteConfig,
+    ProtocolType,
+)
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINKS_FIELD,
     DashboardLink,
@@ -28,6 +33,10 @@ from charm import (
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_NAME = METADATA["name"]
+# Ingress relation endpoints and the apps used to exercise them in tests.
+SIDECAR_INGRESS_ENDPOINT = "ingress"
+SIDECAR_INGRESS_APP = "istio-pilot"
+SECOND_ISTIO_INGRESS_K8S_APP = f"{ISTIO_INGRESS_K8S_APP}-2"
 RELATION_DATA = [
     {
         "app": "tensorboards-web-app",
@@ -386,9 +395,9 @@ class TestSidebarLinks:
     ):
         """Test the charm is in BlockedStatus when both sidecar and ambient relations are added."""
         # Arrange
-        harness.add_relation("ingress", "istio-pilot")
+        harness.add_relation(SIDECAR_INGRESS_ENDPOINT, SIDECAR_INGRESS_APP)
 
-        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, ISTIO_INGRESS_K8S_APP)
 
         harness.set_leader(True)
 
@@ -401,6 +410,62 @@ class TestSidebarLinks:
             harness.charm.model.unit.status,
             BlockedStatus,
         )
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.configmap_handler")
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    def test_multiple_ambient_relations_added(
+        self,
+        k8s_resource_handler: MagicMock,
+        configmap_handler: MagicMock,
+        harness_with_profiles: Harness,
+    ):
+        """Test the charm reconciles to active with more than one istio-ingress-route relation."""
+        # Arrange
+        harness = harness_with_profiles
+        harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, ISTIO_INGRESS_K8S_APP)
+        harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, SECOND_ISTIO_INGRESS_K8S_APP)
+
+        # Act
+        harness.begin_with_initial_hooks()
+        harness.container_pebble_ready(harness.charm._container_name)
+
+        # Assert
+        # More than one relation on the istio-ingress-route endpoint must not block
+        # the charm; it should reconcile all the way to active.
+        assert isinstance(harness.charm.model.unit.status, ActiveStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    @patch("charm.KubeflowDashboardOperator.k8s_resource_handler")
+    def test_each_istio_ingress_route_relation_receives_config(
+        self, k8s_resource_handler: MagicMock, harness: Harness
+    ):
+        """Test that an HTTPRoute config is submitted to every istio-ingress-route relation."""
+        # Arrange
+        harness.set_leader(True)
+        rel_id_1 = harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, ISTIO_INGRESS_K8S_APP)
+        rel_id_2 = harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, SECOND_ISTIO_INGRESS_K8S_APP)
+
+        # Act
+        harness.begin()
+
+        # Assert
+        # Each relation's application databag should contain a valid config that
+        # defines the kubeflow-dashboard HTTPRoute, proving the lib handles every ingress.
+        for rel_id in (rel_id_1, rel_id_2):
+            app_data = harness.get_relation_data(rel_id, harness.charm.app.name)
+            assert "config" in app_data
+
+            config = IstioIngressRouteConfig.model_validate_json(app_data["config"])
+            assert len(config.http_routes) == 1
+            http_route = config.http_routes[0]
+            assert http_route.matches[0].path.type == HTTPPathMatchType.PathPrefix
+            assert http_route.matches[0].path.value == "/"
+            assert http_route.backends[0].service == harness.charm.app.name
+            assert http_route.backends[0].port == harness.charm._port
+            # The route's parent (the Gateway listener referenced under parentRefs in
+            # the HTTPRouteSpec) should be the expected HTTP listener.
+            assert http_route.listener.name == "http-80"
 
     @pytest.mark.parametrize("tls_enabled, expected_port", [(False, 80), (True, 443)])
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
@@ -419,7 +484,7 @@ class TestSidebarLinks:
         mock_ingress.tls_enabled = tls_enabled
         mock_ingress_cls.return_value = mock_ingress
 
-        harness.add_relation("istio-ingress-route", "istio-ingress-k8s")
+        harness.add_relation(ISTIO_INGRESS_ROUTE_ENDPOINT, ISTIO_INGRESS_K8S_APP)
         harness.set_leader(True)
         harness.begin()
 
