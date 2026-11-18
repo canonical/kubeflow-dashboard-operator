@@ -79,9 +79,9 @@ class KubeflowDashboardOperator(CharmBase):
         self._lightkube_field_manager = "lightkube"
         self._profiles_service = None
         self._name = self.model.app.name
-        # If upstream Docker image is integrated replace the command to
-        # /sbin/tini -- npm start
-        # in the service-config.yaml
+        # If using the upstream image, set the service command to
+        # /usr/bin/tini -- npm start in service-config.yaml.
+        # The Rock image command is npm start.
         service_config_path = Path(SERVICE_CONFIG_FILE)
         with open(service_config_path) as f:
             service_config = yaml.safe_load(f)

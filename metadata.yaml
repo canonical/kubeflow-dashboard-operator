@@ -7,17 +7,16 @@ docs: https://discourse.charmhub.io/t/8231
 containers:
   kubeflow-dashboard:
     resource: oci-image
-    uid: 584792
-    gid: 584792
+    # TODO: Restore UID/GID to 584792 for the Rock image when integrating it.
+    uid: 1000
+    gid: 1000
 resources:
   oci-image:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    # If upstream Docker image is integrated replace the command to
-    # /sbin/tini -- npm start
-    # in the service-config.yaml
-    upstream-source: docker.io/charmedkubeflow/centraldashboard:2.0.0-rc.0-919a71a-20260824094353
+    # TODO: Restore the Rock image when integrating the Rock.
+    upstream-source: ghcr.io/kubeflow/dashboard/dashboard:v2.0.1
 provides:
   links:
     interface: kubeflow_dashboard_links

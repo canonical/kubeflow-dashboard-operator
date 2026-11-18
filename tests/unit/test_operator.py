@@ -19,6 +19,7 @@ from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINKS_FIELD,
     DashboardLink,
 )
+from jinja2 import Environment, FileSystemLoader
 from lightkube import ApiError
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.pebble import ChangeError
@@ -118,6 +119,16 @@ class TestCharm:
         with patch("charm.LogForwarder") as mock_logging:
             harness.begin()
             mock_logging.assert_called_once_with(charm=harness.charm)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y: None)
+    def test_configmap_settings_are_json(self, harness: Harness):
+        harness.begin()
+        template = Environment(loader=FileSystemLoader("src/templates")).get_template(
+            "configmaps.yaml.j2"
+        )
+        manifest = yaml.safe_load(template.render(**harness.charm._context))
+
+        assert json.loads(manifest["data"]["settings"]) == {"DASHBOARD_FORCE_IFRAME": True}
 
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
     def test_check_leader_failure(self, harness: Harness):
