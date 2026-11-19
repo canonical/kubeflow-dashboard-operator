@@ -19,8 +19,8 @@ from charmed_kubeflow_chisme.testing import (
     assert_metrics_endpoint,
     assert_path_reachable_through_ingress,
     deploy_and_assert_grafana_agent,
-    deploy_and_integrate_service_mesh_charms,
     get_grafana_dashboards,
+    integrate_with_service_mesh,
 )
 from charms.kubeflow_dashboard.v0.kubeflow_dashboard_links import (
     DASHBOARD_LINK_LOCATIONS,
@@ -59,7 +59,7 @@ KUBEFLOW_PROFILES_RELATION_NAME = "kubeflow-profiles"
 
 # A second istio-ingress-k8s instance used to verify multiple-ingress support.
 SECOND_INGRESS_APP = "istio-ingress-k8s-alt"
-INGRESS_CHANNEL = "2/stable"
+INGRESS_CHANNEL = "1.31/stable"
 # Name of the HTTPRoute submitted by kubeflow-dashboard (see charm._ambient_mesh_ingress).
 INGRESS_ROUTE_NAME = "http-ingress"
 # Gateway listener section for cleartext HTTP on port 80.
@@ -124,7 +124,22 @@ async def test_build_and_deploy(ops_test: OpsTest, request):
         ops_test.model, CHARM_NAME, metrics=True, dashboard=True, logging=True
     )
 
-    await deploy_and_integrate_service_mesh_charms(
+    # Deploy Istio service mesh charms and integrate with Jupyter Controller
+    # TODO: Replace this CLI workaround when migrating to Jubilant; python-libjuju used by
+    # pytest-operator does not support the Ubuntu 26.04 base used by these Istio charms.
+    for charm, options in (
+        ("istio-k8s", ("--config", "platform=")),
+        ("istio-ingress-k8s", ()),
+        ("istio-beacon-k8s", ("--config", "model-on-mesh=true")),
+    ):
+        await ops_test.juju(
+            "deploy", charm, "--channel", INGRESS_CHANNEL, "--trust", *options, check=True
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[charm], status="active", raise_on_error=False, timeout=60 * 15
+        )
+
+    await integrate_with_service_mesh(
         app=CHARM_NAME,
         model=ops_test.model,
     )
