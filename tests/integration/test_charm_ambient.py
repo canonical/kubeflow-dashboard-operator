@@ -431,11 +431,14 @@ async def test_deploy_and_relate_second_ingress(ops_test: OpsTest):
     kubeflow-dashboard must accept more than one istio-ingress-route relation without
     erroring, so it should remain active after the second ingress is related.
     """
-    await ops_test.model.deploy(
+    await ops_test.juju(
+        "deploy",
         ISTIO_INGRESS_K8S_APP,
-        application_name=SECOND_INGRESS_APP,
-        channel=INGRESS_CHANNEL,
-        trust=True,
+        SECOND_INGRESS_APP,
+        "--channel",
+        INGRESS_CHANNEL,
+        "--trust",
+        check=True,
     )
     await ops_test.model.wait_for_idle(
         [SECOND_INGRESS_APP],
