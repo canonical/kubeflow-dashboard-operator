@@ -17,8 +17,8 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    # To restore the Rock image, replace the upstream-source below with:
-    # upstream-source: docker.io/charmedkubeflow/centraldashboard:2.0.0-rc.0-919a71a-20260824094353
+    # When changing the image, also update the command in src/service-config.yaml:
+    # the upstream image uses /usr/bin/tini -- npm start; the Rock uses npm start.
     upstream-source: ghcr.io/kubeflow/dashboard/dashboard:v2.0.1
 provides:
   links:
