@@ -1,3 +1,4 @@
+# Source: https://github.com/kubeflow/dashboard/blob/v2.0.1/components/centraldashboard/manifests/kustomize/base/configmap.yaml
 apiVersion: v1
 data:
   links: |-
@@ -8,7 +9,7 @@ data:
       "documentationItems": {{ documentationItems }}
     }
 
-  settings: "{'DASHBOARD_FORCE_IFRAME': true}"
+  settings: '{{ settings }}'
 kind: ConfigMap
 metadata:
   name: {{ configmap_name }}

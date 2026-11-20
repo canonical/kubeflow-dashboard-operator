@@ -7,17 +7,19 @@ docs: https://discourse.charmhub.io/t/8231
 containers:
   kubeflow-dashboard:
     resource: oci-image
-    uid: 584792
-    gid: 584792
+    # Omit uid/gid to use the upstream image's node:node identity (1000).
+    # Juju rejects explicit UID/GID values in the reserved range 1000-9999.
+    # To restore the Rock, add:
+    # uid: 584792
+    # gid: 584792
 resources:
   oci-image:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    # If upstream Docker image is integrated replace the command to
-    # /sbin/tini -- npm start
-    # in the service-config.yaml
-    upstream-source: docker.io/charmedkubeflow/centraldashboard:2.0.0-rc.0-919a71a-20260824094353
+    # When changing the image, also update the command in src/service-config.yaml:
+    # the upstream image uses /usr/bin/tini -- npm start; the Rock uses npm start.
+    upstream-source: ghcr.io/kubeflow/dashboard/dashboard:v2.0.1
 provides:
   links:
     interface: kubeflow_dashboard_links

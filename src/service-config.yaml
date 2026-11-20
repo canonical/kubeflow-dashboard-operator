@@ -1,1 +1,2 @@
-command: "npm start"
+# TODO: Restore the Rock command (npm start) when integrating the Rock.
+command: "/usr/bin/tini -- npm start"
